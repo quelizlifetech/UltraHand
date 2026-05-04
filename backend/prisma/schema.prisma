@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  doctor
+  patient
+}
+
+enum HandSide {
+  Left
+  Right
+}
+
+enum PatientStatus {
+  Active
+  Recovering
+  Completed
+}
+
+enum TherapyMode {
+  Active
+  Passive
+  Assisted
+}
+
+model User {
+  id   String @id @default(cuid())
+  name String
+
+  // Doctor uses email login
+  email String? @unique
+
+  // Patient uses phone login
+  phone String? @unique
+
+  password String
+  role     Role
+
+  // Force patient to change default password after first login
+  mustChangePassword Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  patients       Patient[] @relation("DoctorPatients")
+  patientProfile Patient?  @relation("PatientUser")
+
+  sentMessages     Message[] @relation("Sender")
+  receivedMessages Message[] @relation("Receiver")
+}
+
+model Patient {
+  id        String @id @default(cuid())
+  patientId String @unique
+
+  name      String
+  age       Int
+  diagnosis String
+  category  String
+  handSide  HandSide
+  status    PatientStatus @default(Active)
+
+  // Assigned doctor
+  doctorId String
+  doctor   User   @relation("DoctorPatients", fields: [doctorId], references: [id])
+
+  // Linked patient login user account
+  userId String? @unique
+  user   User?   @relation("PatientUser", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  therapyConfig TherapyConfig?
+  baselineROM   BaselineROM?
+  plans         TherapyPlan[]
+  sessions      Session[]
+}
+
+model TherapyConfig {
+  id String @id @default(cuid())
+
+  patientId String  @unique
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  sessionsPerDay  Int
+  therapyMode     TherapyMode
+  durationMinutes Int
+  affectedJoints  String[]
+  severityLevel   String
+}
+
+model BaselineROM {
+  id String @id @default(cuid())
+
+  patientId String  @unique
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // Fingers
+  index_mcp Float
+  index_pip Float
+  index_dip Float
+
+  middle_mcp Float
+  middle_pip Float
+  middle_dip Float
+
+  ring_mcp Float
+  ring_pip Float
+  ring_dip Float
+
+  little_mcp Float
+  little_pip Float
+  little_dip Float
+
+  // Thumb
+  thumb_mcp Float
+  thumb_ip  Float
+
+  // Wrist
+  wrist_flexion          Float
+  wrist_extension        Float
+  wrist_radial_deviation Float
+  wrist_ulnar_deviation  Float
+}
+
+model TherapyPlan {
+  id String @id @default(cuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  intensity   String
+  repetitions Int
+  targetROM   Float
+
+  isApproved  Boolean @default(false)
+  isFinalized Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id String @id @default(cuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  date DateTime @default(now())
+
+  painLevel Int
+  fatigue   Boolean @default(false)
+  notes     String?
+
+  metrics SessionMetric[]
+}
+
+model SessionMetric {
+  id String @id @default(cuid())
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  jointName String
+  angle     Float
+  speed     Float
+}
+
+model Message {
+  id String @id @default(cuid())
+
+  senderId String
+  sender   User   @relation("Sender", fields: [senderId], references: [id])
+
+  receiverId String
+  receiver   User   @relation("Receiver", fields: [receiverId], references: [id])
+
+  message String
+
+  createdAt DateTime @default(now())
+}

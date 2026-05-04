@@ -1,0 +1,16 @@
+# ULTRAHAND — Python Dependencies
+# Install with: pip install -r requirements.txt
+# Tested on Python 3.9, 3.10, 3.11, 3.12
+
+# Core data & ML
+numpy>=1.24.0
+pandas>=1.5.0
+scikit-learn>=1.2.0
+joblib>=1.2.0
+
+# Required by scikit-learn internally
+scipy>=1.10.0
+threadpoolctl>=3.1.0
+
+# Required by pandas internally
+python-dateutil>=2.8.2

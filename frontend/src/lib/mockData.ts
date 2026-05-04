@@ -1,0 +1,107 @@
+import { Patient, ROM } from "./types";
+
+const baseROM = (): ROM => ({
+  index: { mcp: 85, pip: 95, dip: 70 },
+  middle: { mcp: 88, pip: 100, dip: 75 },
+  ring: { mcp: 85, pip: 95, dip: 70 },
+  little: { mcp: 80, pip: 90, dip: 65 },
+  thumb: { mcp: 50, ip: 70 },
+  wrist: { flexion: 70, extension: 65, radialDeviation: 20, ulnarDeviation: 30 },
+});
+
+const lowROM = (): ROM => ({
+  index: { mcp: 45, pip: 55, dip: 30 },
+  middle: { mcp: 50, pip: 60, dip: 35 },
+  ring: { mcp: 48, pip: 55, dip: 30 },
+  little: { mcp: 40, pip: 50, dip: 25 },
+  thumb: { mcp: 30, ip: 40 },
+  wrist: { flexion: 40, extension: 35, radialDeviation: 12, ulnarDeviation: 18 },
+});
+
+export const mockPatients: Patient[] = [
+  {
+    id: "UH-1042",
+    name: "Aarav Sharma",
+    age: 34,
+    diagnosis: "Carpal Tunnel Syndrome (Post-op)",
+    category: "Post-surgical",
+    handSide: "Right",
+    status: "Active",
+    injury: "Carpal Tunnel Release",
+    recoveryStage: "Early Mobilization",
+    baselineROM: lowROM(),
+    plan: {
+      intensity: "Medium", repetitions: 12, targetROM: 70,
+      sessionsPerDay: 2, sessionDuration: 20, mode: "Guided Flexion",
+      affectedJoints: ["Wrist", "Index MCP", "Middle MCP"],
+      severity: "Moderate", finalized: true, active: true,
+    },
+    sessions: Array.from({ length: 10 }, (_, i) => ({
+      id: `s-${i}`,
+      date: new Date(Date.now() - (10 - i) * 86400000).toISOString(),
+      romAchieved: 40 + i * 2.5 + Math.random() * 4,
+      pain: Math.max(1, 6 - i * 0.4 + (Math.random() - 0.5)),
+      fatigue: i % 3 === 0,
+      movementQuality: i > 6 ? "Good" : i > 3 ? "Fair" : "Poor",
+    })),
+    medications: [
+      { id: "m1", name: "Ibuprofen", dosage: "400mg", timing: "After meals, 2x/day" },
+      { id: "m2", name: "Vitamin B Complex", dosage: "1 tab", timing: "Morning" },
+    ],
+    alerts: ["Pain spike reported in last session"],
+    createdAt: new Date(Date.now() - 12 * 86400000).toISOString(),
+  },
+  {
+    id: "UH-1043",
+    name: "Priya Verma",
+    age: 28,
+    diagnosis: "Distal Radius Fracture (Healed)",
+    category: "Fracture Recovery",
+    handSide: "Left",
+    status: "Recovering",
+    injury: "Wrist Fracture",
+    recoveryStage: "Strengthening",
+    baselineROM: baseROM(),
+    plan: {
+      intensity: "Low", repetitions: 10, targetROM: 80,
+      sessionsPerDay: 1, sessionDuration: 15, mode: "Range Recovery",
+      affectedJoints: ["Wrist"], severity: "Mild",
+      finalized: true, active: true,
+    },
+    sessions: Array.from({ length: 7 }, (_, i) => ({
+      id: `s-${i}`,
+      date: new Date(Date.now() - (7 - i) * 86400000).toISOString(),
+      romAchieved: 55 + i * 3,
+      pain: Math.max(0, 3 - i * 0.3),
+      fatigue: false,
+      movementQuality: "Good",
+    })),
+    medications: [],
+    alerts: [],
+    createdAt: new Date(Date.now() - 25 * 86400000).toISOString(),
+  },
+  {
+    id: "UH-1044",
+    name: "Rohan Kapoor",
+    age: 52,
+    diagnosis: "Stroke-related Hand Weakness",
+    category: "Neurological",
+    handSide: "Right",
+    status: "Active",
+    injury: "Hemiparesis",
+    recoveryStage: "Motor Re-education",
+    baselineROM: lowROM(),
+    plan: {
+      intensity: "Low", repetitions: 8, targetROM: 55,
+      sessionsPerDay: 3, sessionDuration: 12, mode: "Neuro Activation",
+      affectedJoints: ["Index PIP", "Thumb MCP", "Wrist"],
+      severity: "Severe", finalized: false, active: false,
+    },
+    sessions: [],
+    medications: [
+      { id: "m1", name: "Aspirin", dosage: "75mg", timing: "Morning" },
+    ],
+    alerts: ["Plan pending finalization", "Missed 2 sessions"],
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+];
