@@ -21,28 +21,94 @@ import { ROMInput } from "@/components/forms/ROMInput";
 
 export default function AddPatient() {
   const navigate = useNavigate();
-
   const [loading, setLoading] = useState(false);
 
-  /* ---------------- PATIENT INFO ---------------- */
+  const diagnosisToCategoryMap: Record<string, string> = {
+    Stroke: "Neurological",
+    "Cerebral Palsy": "Neurological",
+    "Peripheral Neuropathy": "Neurological",
+    "Rheumatoid Arthritis": "Musculoskeletal",
+    Osteoarthritis: "Musculoskeletal",
+    "Fracture Rehabilitation": "Musculoskeletal",
+    "Tendon Repair": "Musculoskeletal",
+    "Post Surgical": "Post_Operative",
+    "Dupuytren Contracture": "Post_Operative",
+  };
+
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
-  const [diagnosis, setDiagnosis] = useState("");
-  const [category, setCategory] = useState("Post-surgical");
-  const [handSide, setHandSide] = useState("Right");
-  const [status, setStatus] = useState("Active");
 
-  /* ---------------- THERAPY CONFIG ---------------- */
-  const [sessionsPerDay, setSessionsPerDay] = useState("2");
-  const [therapyMode, setTherapyMode] = useState("Active");
-  const [durationMinutes, setDurationMinutes] = useState("20");
-  const [affectedJoints, setAffectedJoints] = useState(
-    "Wrist, Index MCP"
-  );
-  const [severityLevel, setSeverityLevel] =
-    useState("Moderate");
+  // ✅ FORCE STRING TYPES
+  const [diagnosis, setDiagnosis] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
+  const [handSide, setHandSide] = useState<string>("Right");
+  const [therapyMode, setTherapyMode] =
+    useState<string>("Assistive");
 
-  /* ---------------- ROM ---------------- */
+  const [sessionsPerDay, setSessionsPerDay] =
+    useState("");
+
+  const [sessionsCompleted, setSessionsCompleted] =
+    useState("");
+
+  const [durationMinutes, setDurationMinutes] =
+    useState("");
+
+  const [repsCompleted, setRepsCompleted] =
+    useState("");
+
+  const [stiffness, setStiffness] = useState("");
+
+  const clamp = (
+    val: number,
+    min: number,
+    max: number
+  ) => Math.max(min, Math.min(max, val));
+
+  const handleNumber =
+    (
+      setter: (v: string) => void,
+      min: number,
+      max: number
+    ) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      let raw = e.target.value;
+
+      if (raw === "") {
+        setter("");
+        return;
+      }
+
+      let val = Number(raw);
+
+      if (isNaN(val)) return;
+
+      val = clamp(val, min, max);
+
+      setter(String(val));
+    };
+
+  // ✅ FIXED
+  const mapTherapyMode = (
+    mode: string
+  ): string => {
+    const safeMode = String(mode);
+
+    switch (safeMode) {
+      case "Mechanical":
+        return "Mechanical";
+
+      case "Passive":
+        return "Passive";
+
+      case "Active":
+        return "Active";
+
+      default:
+        return "Assistive";
+    }
+  };
+
   const [rom, setRom] = useState({
     index_mcp: 0,
     index_pip: 0,
@@ -65,61 +131,103 @@ export default function AddPatient() {
 
     wrist_flexion: 0,
     wrist_extension: 0,
-    wrist_radial_deviation: 0,
-    wrist_ulnar_deviation: 0,
+
+    wrist_radial_dev: 0,
+    wrist_ulnar_dev: 0,
   });
 
-  /* ---------------- ACCOUNT ---------------- */
-  const [phone, setPhone] = useState("");
-
-  const updateRom = (key: string, value: number) => {
+  const updateRom = (
+    key: string,
+    value: number
+  ) => {
     setRom((prev) => ({
       ...prev,
-      [key]: value,
+      [key]: clamp(value, 0, 120),
     }));
+  };
+
+  // ✅ FIXED
+  const handleDiagnosisChange = (
+    value: string
+  ) => {
+    const safeValue = String(value);
+
+    setDiagnosis(safeValue);
+
+    setCategory(
+      diagnosisToCategoryMap[safeValue] ||
+        "Other"
+    );
   };
 
   const submit = async () => {
     try {
       setLoading(true);
 
-      await api.post("/patients", {
-        name,
-        age: Number(age),
+      // ✅ DEBUG
+      console.log({
         diagnosis,
         category,
-        handSide,
-        status,
-
-        therapyConfig: {
-          sessionsPerDay: Number(sessionsPerDay),
-          therapyMode,
-          durationMinutes: Number(durationMinutes),
-          affectedJoints: affectedJoints
-            .split(",")
-            .map((j) => j.trim())
-            .filter(Boolean),
-          severityLevel,
-        },
-
-        baselineROM: rom,
-
-        account: phone
-          ? {
-              phone,
-              password: "12345",
-            }
-          : undefined,
+        therapyMode,
       });
 
+      const payload = {
+        name: String(name),
+
+        age: Number(age || 0),
+
+        // ✅ FORCE STRINGS
+        diagnosis: String(diagnosis),
+
+        category: String(category),
+
+        handSide: String(handSide),
+
+        ml_input: {
+          // ✅ FORCE STRING
+          therapy_mode: String(
+            mapTherapyMode(therapyMode)
+          ),
+
+          sessions_per_day: Number(
+            sessionsPerDay || 1
+          ),
+
+          sessions_completed: Number(
+            sessionsCompleted || 0
+          ),
+
+          session_duration: Number(
+            durationMinutes || 15
+          ),
+
+          repetitions_completed: Number(
+            repsCompleted || 10
+          ),
+
+          stiffness: Number(stiffness || 3),
+
+          joints: rom,
+        },
+      };
+
+      console.log(
+        "FINAL PAYLOAD:",
+        JSON.stringify(payload, null, 2)
+      );
+
+      await api.post("/patients", payload);
+
       toast.success(
-        "Patient created successfully. Default password is 12345"
+        "Patient created successfully"
       );
 
       navigate("/doctor/patients");
     } catch (error: any) {
+      console.error(error);
+
       toast.error(
-        error.message || "Failed to create patient"
+        error.message || "Validation failed"
       );
     } finally {
       setLoading(false);
@@ -128,35 +236,28 @@ export default function AddPatient() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      {/* BACK */}
       <button
         onClick={() => navigate(-1)}
-        className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+        className="flex items-center gap-1 text-sm"
       >
         <ArrowLeft className="h-4 w-4" />
         Back
       </button>
 
-      {/* TITLE */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Add Patient
-        </h1>
+      <h1 className="text-2xl font-semibold">
+        Add Patient
+      </h1>
 
-        <p className="text-sm text-muted-foreground mt-1">
-          Create patient profile and therapy setup.
-        </p>
-      </div>
-
-      {/* SECTION A */}
+      {/* PATIENT INFO */}
       <section className="clinical-card p-6 space-y-4">
         <h2 className="font-semibold">
-          Patient Information
+          Patient Info
         </h2>
 
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <Label>Full Name</Label>
+
             <Input
               value={name}
               onChange={(e) =>
@@ -167,216 +268,114 @@ export default function AddPatient() {
 
           <div>
             <Label>Age</Label>
+
             <Input
               type="number"
               value={age}
-              onChange={(e) =>
-                setAge(e.target.value)
-              }
+              onChange={handleNumber(
+                setAge,
+                1,
+                120
+              )}
             />
           </div>
 
           <div>
             <Label>Diagnosis</Label>
-            <Input
-              value={diagnosis}
-              onChange={(e) =>
-                setDiagnosis(e.target.value)
+
+            <Select
+              value={String(diagnosis)}
+              onValueChange={(v) =>
+                handleDiagnosisChange(
+                  String(v)
+                )
               }
-            />
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Diagnosis" />
+              </SelectTrigger>
+
+              <SelectContent>
+                {Object.keys(
+                  diagnosisToCategoryMap
+                ).map((d) => (
+                  <SelectItem
+                    key={d}
+                    value={String(d)}
+                  >
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <Label>Category</Label>
 
-            <Select
-              value={category}
-              onValueChange={setCategory}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="Post-surgical">
-                  Post-surgical
-                </SelectItem>
-
-                <SelectItem value="Fracture Recovery">
-                  Fracture Recovery
-                </SelectItem>
-
-                <SelectItem value="Neurological">
-                  Neurological
-                </SelectItem>
-
-                <SelectItem value="Tendon Injury">
-                  Tendon Injury
-                </SelectItem>
-
-                <SelectItem value="Arthritis">
-                  Arthritis
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <Input
+              value={String(category)}
+              disabled
+            />
           </div>
 
           <div>
             <Label>Hand Side</Label>
 
             <Select
-              value={handSide}
-              onValueChange={setHandSide}
+              value={String(handSide)}
+              onValueChange={(v) =>
+                setHandSide(String(v))
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
 
               <SelectContent>
+                <SelectItem value="Right">
+                  Right
+                </SelectItem>
+
                 <SelectItem value="Left">
                   Left
                 </SelectItem>
 
-                <SelectItem value="Right">
-                  Right
+                <SelectItem value="Both">
+                  Both
                 </SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div>
-            <Label>Status</Label>
-
-            <Select
-              value={status}
-              onValueChange={setStatus}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="Active">
-                  Active
-                </SelectItem>
-
-                <SelectItem value="Recovering">
-                  Recovering
-                </SelectItem>
-
-                <SelectItem value="Completed">
-                  Completed
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION B */}
-      <section className="clinical-card p-6 space-y-4">
-        <h2 className="font-semibold">
-          Therapy Configuration
-        </h2>
-
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <Label>Sessions Per Day</Label>
-            <Input
-              type="number"
-              value={sessionsPerDay}
-              onChange={(e) =>
-                setSessionsPerDay(
-                  e.target.value
-                )
-              }
-            />
           </div>
 
           <div>
             <Label>Therapy Mode</Label>
 
             <Select
-              value={therapyMode}
-              onValueChange={setTherapyMode}
+              value={String(therapyMode)}
+              onValueChange={(v) =>
+                setTherapyMode(String(v))
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
 
               <SelectContent>
-                <SelectItem value="Active">
-                  Active
+                <SelectItem value="Mechanical">
+                  Mechanical Stimulation
                 </SelectItem>
 
                 <SelectItem value="Passive">
                   Passive
                 </SelectItem>
 
-                <SelectItem value="Assisted">
-                  Assisted
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>
-              Duration Minutes
-            </Label>
-
-            <Input
-              type="number"
-              value={durationMinutes}
-              onChange={(e) =>
-                setDurationMinutes(
-                  e.target.value
-                )
-              }
-            />
-          </div>
-
-          <div>
-            <Label>
-              Affected Joints
-            </Label>
-
-            <Input
-              value={affectedJoints}
-              onChange={(e) =>
-                setAffectedJoints(
-                  e.target.value
-                )
-              }
-            />
-          </div>
-
-          <div>
-            <Label>
-              Severity Level
-            </Label>
-
-            <Select
-              value={severityLevel}
-              onValueChange={
-                setSeverityLevel
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="Mild">
-                  Mild
+                <SelectItem value="Assistive">
+                  Assistive
                 </SelectItem>
 
-                <SelectItem value="Moderate">
-                  Moderate
-                </SelectItem>
-
-                <SelectItem value="Severe">
-                  Severe
+                <SelectItem value="Active">
+                  Active
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -384,341 +383,311 @@ export default function AddPatient() {
         </div>
       </section>
 
-      {/* SECTION C */}
+      {/* SESSION */}
+      <section className="clinical-card p-6 grid md:grid-cols-2 gap-4">
+        <div>
+          <Label>Sessions Per Day</Label>
+
+          <Input
+            type="number"
+            value={sessionsPerDay}
+            onChange={handleNumber(
+              setSessionsPerDay,
+              1,
+              10
+            )}
+          />
+        </div>
+
+        <div>
+          <Label>Sessions Completed</Label>
+
+          <Input
+            type="number"
+            value={sessionsCompleted}
+            onChange={handleNumber(
+              setSessionsCompleted,
+              0,
+              10
+            )}
+          />
+        </div>
+
+        <div>
+          <Label>Duration (min)</Label>
+
+          <Input
+            type="number"
+            value={durationMinutes}
+            onChange={handleNumber(
+              setDurationMinutes,
+              5,
+              60
+            )}
+          />
+        </div>
+
+        <div>
+          <Label>Repetitions</Label>
+
+          <Input
+            type="number"
+            value={repsCompleted}
+            onChange={handleNumber(
+              setRepsCompleted,
+              1,
+              100
+            )}
+          />
+        </div>
+
+        <div>
+          <Label>Stiffness (1–5)</Label>
+
+          <Input
+            type="number"
+            value={stiffness}
+            onChange={handleNumber(
+              setStiffness,
+              1,
+              5
+            )}
+          />
+        </div>
+      </section>
+
+      {/* FULL ROM — ALL FINGERS */}
       <section className="clinical-card p-6 space-y-6">
         <h2 className="font-semibold">
           Baseline ROM
         </h2>
 
-        {/* INDEX */}
         <div>
-          <p className="font-medium mb-3">
-            Index Finger
-          </p>
+          <h3>Index</h3>
 
-          <div className="grid grid-cols-3 gap-3">
-            <ROMInput
-              label="MCP"
-              value={rom.index_mcp}
-              onChange={(v) =>
-                updateRom(
-                  "index_mcp",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-
-            <ROMInput
-              label="PIP"
-              value={rom.index_pip}
-              onChange={(v) =>
-                updateRom(
-                  "index_pip",
-                  v
-                )
-              }
-              min={0}
-              max={110}
-            />
-
-            <ROMInput
-              label="DIP"
-              value={rom.index_dip}
-              onChange={(v) =>
-                updateRom(
-                  "index_dip",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-          </div>
-        </div>
-
-        {/* MIDDLE */}
-        <div>
-          <p className="font-medium mb-3">
-            Middle Finger
-          </p>
-
-          <div className="grid grid-cols-3 gap-3">
-            <ROMInput
-              label="MCP"
-              value={rom.middle_mcp}
-              onChange={(v) =>
-                updateRom(
-                  "middle_mcp",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-
-            <ROMInput
-              label="PIP"
-              value={rom.middle_pip}
-              onChange={(v) =>
-                updateRom(
-                  "middle_pip",
-                  v
-                )
-              }
-              min={0}
-              max={110}
-            />
-
-            <ROMInput
-              label="DIP"
-              value={rom.middle_dip}
-              onChange={(v) =>
-                updateRom(
-                  "middle_dip",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-          </div>
-        </div>
-
-        {/* RING */}
-        <div>
-          <p className="font-medium mb-3">
-            Ring Finger
-          </p>
-
-          <div className="grid grid-cols-3 gap-3">
-            <ROMInput
-              label="MCP"
-              value={rom.ring_mcp}
-              onChange={(v) =>
-                updateRom(
-                  "ring_mcp",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-
-            <ROMInput
-              label="PIP"
-              value={rom.ring_pip}
-              onChange={(v) =>
-                updateRom(
-                  "ring_pip",
-                  v
-                )
-              }
-              min={0}
-              max={110}
-            />
-
-            <ROMInput
-              label="DIP"
-              value={rom.ring_dip}
-              onChange={(v) =>
-                updateRom(
-                  "ring_dip",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-          </div>
-        </div>
-
-        {/* LITTLE */}
-        <div>
-          <p className="font-medium mb-3">
-            Little Finger
-          </p>
-
-          <div className="grid grid-cols-3 gap-3">
-            <ROMInput
-              label="MCP"
-              value={rom.little_mcp}
-              onChange={(v) =>
-                updateRom(
-                  "little_mcp",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-
-            <ROMInput
-              label="PIP"
-              value={rom.little_pip}
-              onChange={(v) =>
-                updateRom(
-                  "little_pip",
-                  v
-                )
-              }
-              min={0}
-              max={110}
-            />
-
-            <ROMInput
-              label="DIP"
-              value={rom.little_dip}
-              onChange={(v) =>
-                updateRom(
-                  "little_dip",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-          </div>
-        </div>
-
-        {/* THUMB */}
-        <div>
-          <p className="font-medium mb-3">
-            Thumb
-          </p>
-
-          <div className="grid grid-cols-2 gap-3">
-            <ROMInput
-              label="MCP"
-              value={rom.thumb_mcp}
-              onChange={(v) =>
-                updateRom(
-                  "thumb_mcp",
-                  v
-                )
-              }
-              min={0}
-              max={70}
-            />
-
-            <ROMInput
-              label="IP"
-              value={rom.thumb_ip}
-              onChange={(v) =>
-                updateRom(
-                  "thumb_ip",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-          </div>
-        </div>
-
-        {/* WRIST */}
-        <div>
-          <p className="font-medium mb-3">
-            Wrist
-          </p>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <ROMInput
-              label="Flexion"
-              value={rom.wrist_flexion}
-              onChange={(v) =>
-                updateRom(
-                  "wrist_flexion",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-
-            <ROMInput
-              label="Extension"
-              value={rom.wrist_extension}
-              onChange={(v) =>
-                updateRom(
-                  "wrist_extension",
-                  v
-                )
-              }
-              min={0}
-              max={90}
-            />
-
-            <ROMInput
-              label="Radial Dev."
-              value={
-                rom.wrist_radial_deviation
-              }
-              onChange={(v) =>
-                updateRom(
-                  "wrist_radial_deviation",
-                  v
-                )
-              }
-              min={0}
-              max={30}
-            />
-
-            <ROMInput
-              label="Ulnar Dev."
-              value={
-                rom.wrist_ulnar_deviation
-              }
-              onChange={(v) =>
-                updateRom(
-                  "wrist_ulnar_deviation",
-                  v
-                )
-              }
-              min={0}
-              max={45}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ACCOUNT */}
-      <section className="clinical-card p-6 space-y-4">
-        <h2 className="font-semibold">
-          Patient Login Account
-        </h2>
-
-        <div>
-          <Label>
-            Phone Number
-          </Label>
-
-          <Input
-            placeholder="Enter patient phone"
-            value={phone}
-            onChange={(e) =>
-              setPhone(e.target.value)
+          <ROMInput
+            label="MCP"
+            value={rom.index_mcp}
+            onChange={(v) =>
+              updateRom("index_mcp", v)
             }
+            min={0}
+            max={90}
           />
 
-          <p className="text-xs text-muted-foreground mt-2">
-            Default password:
-            12345
-          </p>
+          <ROMInput
+            label="PIP"
+            value={rom.index_pip}
+            onChange={(v) =>
+              updateRom("index_pip", v)
+            }
+            min={0}
+            max={110}
+          />
+
+          <ROMInput
+            label="DIP"
+            value={rom.index_dip}
+            onChange={(v) =>
+              updateRom("index_dip", v)
+            }
+            min={0}
+            max={90}
+          />
+        </div>
+
+        <div>
+          <h3>Middle</h3>
+
+          <ROMInput
+            label="MCP"
+            value={rom.middle_mcp}
+            onChange={(v) =>
+              updateRom("middle_mcp", v)
+            }
+            min={0}
+            max={90}
+          />
+
+          <ROMInput
+            label="PIP"
+            value={rom.middle_pip}
+            onChange={(v) =>
+              updateRom("middle_pip", v)
+            }
+            min={0}
+            max={110}
+          />
+
+          <ROMInput
+            label="DIP"
+            value={rom.middle_dip}
+            onChange={(v) =>
+              updateRom("middle_dip", v)
+            }
+            min={0}
+            max={90}
+          />
+        </div>
+
+        <div>
+          <h3>Ring</h3>
+
+          <ROMInput
+            label="MCP"
+            value={rom.ring_mcp}
+            onChange={(v) =>
+              updateRom("ring_mcp", v)
+            }
+            min={0}
+            max={90}
+          />
+
+          <ROMInput
+            label="PIP"
+            value={rom.ring_pip}
+            onChange={(v) =>
+              updateRom("ring_pip", v)
+            }
+            min={0}
+            max={110}
+          />
+
+          <ROMInput
+            label="DIP"
+            value={rom.ring_dip}
+            onChange={(v) =>
+              updateRom("ring_dip", v)
+            }
+            min={0}
+            max={90}
+          />
+        </div>
+
+        <div>
+          <h3>Little</h3>
+
+          <ROMInput
+            label="MCP"
+            value={rom.little_mcp}
+            onChange={(v) =>
+              updateRom("little_mcp", v)
+            }
+            min={0}
+            max={90}
+          />
+
+          <ROMInput
+            label="PIP"
+            value={rom.little_pip}
+            onChange={(v) =>
+              updateRom("little_pip", v)
+            }
+            min={0}
+            max={110}
+          />
+
+          <ROMInput
+            label="DIP"
+            value={rom.little_dip}
+            onChange={(v) =>
+              updateRom("little_dip", v)
+            }
+            min={0}
+            max={90}
+          />
+        </div>
+
+        <div>
+          <h3>Thumb</h3>
+
+          <ROMInput
+            label="MCP"
+            value={rom.thumb_mcp}
+            onChange={(v) =>
+              updateRom("thumb_mcp", v)
+            }
+            min={0}
+            max={70}
+          />
+
+          <ROMInput
+            label="IP"
+            value={rom.thumb_ip}
+            onChange={(v) =>
+              updateRom("thumb_ip", v)
+            }
+            min={0}
+            max={90}
+          />
+        </div>
+
+        <div>
+          <h3>Wrist</h3>
+
+          <ROMInput
+            label="Flexion"
+            value={rom.wrist_flexion}
+            onChange={(v) =>
+              updateRom(
+                "wrist_flexion",
+                v
+              )
+            }
+            min={0}
+            max={90}
+          />
+
+          <ROMInput
+            label="Extension"
+            value={rom.wrist_extension}
+            onChange={(v) =>
+              updateRom(
+                "wrist_extension",
+                v
+              )
+            }
+            min={0}
+            max={90}
+          />
+
+          <ROMInput
+            label="Radial Dev"
+            value={rom.wrist_radial_dev}
+            onChange={(v) =>
+              updateRom(
+                "wrist_radial_dev",
+                v
+              )
+            }
+            min={0}
+            max={30}
+          />
+
+          <ROMInput
+            label="Ulnar Dev"
+            value={rom.wrist_ulnar_dev}
+            onChange={(v) =>
+              updateRom(
+                "wrist_ulnar_dev",
+                v
+              )
+            }
+            min={0}
+            max={45}
+          />
         </div>
       </section>
 
-      {/* SUBMIT */}
       <Button
         onClick={submit}
         disabled={loading}
-        className="gradient-primary w-full"
+        className="w-full"
       >
-        <CheckCircle2 className="h-4 w-4 mr-2" />
+        <CheckCircle2 className="mr-2" />
 
         {loading
-          ? "Creating Patient..."
+          ? "Creating..."
           : "Create Patient"}
       </Button>
     </div>

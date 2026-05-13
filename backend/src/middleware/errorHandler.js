@@ -1,7 +1,27 @@
-module.exports = (err, _req, res, _next) => {
-  const status = err.status || 500;
-  const body = { error: err.message || "Internal Server Error" };
-  if (err.details) body.details = err.details;
-  if (status >= 500) console.error(err);
-  res.status(status).json(body);
+module.exports = (err, req, res, next) => {
+  console.error("🔥 ERROR CAUGHT BY MIDDLEWARE:");
+  console.error(err);
+
+  // Prisma errors (VERY IMPORTANT)
+  if (err.code && err.code.startsWith("P")) {
+    return res.status(400).json({
+      success: false,
+      message: "Database error",
+      prisma: err.message,
+    });
+  }
+
+  // Custom API error
+  if (err.status) {
+    return res.status(err.status).json({
+      success: false,
+      message: err.message,
+    });
+  }
+
+  // Fallback
+  return res.status(500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
 };

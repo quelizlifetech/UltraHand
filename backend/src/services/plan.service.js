@@ -65,6 +65,7 @@ async function getPlan(
   const plan =
     await prisma.therapyPlan.findUnique({
       where: { id },
+
       include: {
         patient: true,
       },
@@ -117,6 +118,7 @@ async function updatePlan(
 
   return prisma.therapyPlan.update({
     where: { id },
+
     data: rest,
   });
 }
@@ -135,6 +137,7 @@ async function approvePlan(
 
   return prisma.therapyPlan.update({
     where: { id },
+
     data: {
       isApproved: true,
     },
@@ -162,6 +165,7 @@ async function finalizePlan(
 
   return prisma.therapyPlan.update({
     where: { id },
+
     data: {
       isFinalized: true,
     },
@@ -179,6 +183,7 @@ async function getActiveFinalizedPlan(
       patientId,
       isFinalized: true,
     },
+
     orderBy: {
       createdAt: "desc",
     },
@@ -190,13 +195,14 @@ async function getActiveFinalizedPlan(
 --------------------------------------------------- */
 function num(v, d = 0) {
   const n = Number(v);
+
   return Number.isFinite(n)
     ? n
     : d;
 }
 
 /* ---------------------------------------------------
-   Build ML Payload from DB
+   Build ML Payload
 --------------------------------------------------- */
 function buildPayload(
   patient
@@ -252,11 +258,13 @@ function buildPayload(
         rom.index_mcp,
         40
       ),
+
     index_pip:
       num(
         rom.index_pip,
         50
       ),
+
     index_dip:
       num(
         rom.index_dip,
@@ -268,11 +276,13 @@ function buildPayload(
         rom.middle_mcp,
         40
       ),
+
     middle_pip:
       num(
         rom.middle_pip,
         50
       ),
+
     middle_dip:
       num(
         rom.middle_dip,
@@ -284,11 +294,13 @@ function buildPayload(
         rom.ring_mcp,
         40
       ),
+
     ring_pip:
       num(
         rom.ring_pip,
         50
       ),
+
     ring_dip:
       num(
         rom.ring_dip,
@@ -300,11 +312,13 @@ function buildPayload(
         rom.little_mcp,
         40
       ),
+
     little_pip:
       num(
         rom.little_pip,
         50
       ),
+
     little_dip:
       num(
         rom.little_dip,
@@ -316,6 +330,7 @@ function buildPayload(
         rom.thumb_mcp,
         30
       ),
+
     thumb_ip:
       num(
         rom.thumb_ip,
@@ -349,6 +364,120 @@ function buildPayload(
 }
 
 /* ---------------------------------------------------
+   Normalize AI Report
+--------------------------------------------------- */
+function normalizeAIReport(report) {
+  if (!report) {
+    return null;
+  }
+
+  return {
+    summary: {
+      estimated_days:
+        report.summary?.totalDays ||
+        report.summary?.estimated_days ||
+        0,
+
+      recovery_percent:
+        report.summary?.recoveryPercent ||
+        report.summary?.recovery_percent ||
+        0,
+
+      success_chance:
+        report.summary?.successChance ||
+        report.summary?.success_chance ||
+        report.summary?.recoveryPercent ||
+        0,
+
+      risk_level:
+        report.summary?.riskLevel ||
+        report.summary?.risk_level ||
+        "Unknown",
+    },
+
+    recovery_curve:
+      (
+        report.recoveryCurve ||
+        report.recovery_curve ||
+        []
+      ).map((item) => ({
+        day:
+          item.day || 0,
+
+        rom:
+          item.avgROM ||
+          item.rom ||
+          0,
+
+        recovery:
+          item.recoveryPercent ||
+          item.recovery ||
+          0,
+      })),
+
+    daywise_plan:
+      (
+        report.daywisePlan ||
+        report.daywise_plan ||
+        []
+      ).map((item) => ({
+        day:
+          item.day || 0,
+
+        mode:
+          item.phase ||
+          item.mode ||
+          "Unknown",
+
+        intensity:
+          item.intensity ||
+          "Moderate",
+
+        repetitions:
+          item.repetitions ||
+          10,
+
+        rom:
+          item.avgROM ||
+          item.rom ||
+          0,
+      })),
+
+    joint_analysis:
+      Array.isArray(
+        report.joint_analysis
+      )
+        ? report.joint_analysis
+        : Object.entries(
+            report.jointSummary || {}
+          ).map(
+            ([joint, data]) => ({
+              joint,
+
+              improvement:
+                (
+                  data.normal_rom || 0
+                ) -
+                (
+                  data.starting_rom || 0
+                ),
+
+              deficit:
+                data.deficit || 0,
+            })
+          ),
+
+    mode_distribution:
+      report.modeDistribution ||
+      report.mode_distribution ||
+      {},
+
+    warnings:
+      report.warnings || [],
+  };
+}
+
+/* ---------------------------------------------------
    AI Generate Plan
 --------------------------------------------------- */
 async function generateAIPlan(
@@ -365,6 +494,7 @@ async function generateAIPlan(
       where: {
         id: patientId,
       },
+
       include: {
         therapyConfig: true,
         baselineROM: true,
@@ -389,10 +519,12 @@ async function generateAIPlan(
         ML_API_URL,
         {
           method: "POST",
+
           headers: {
             "Content-Type":
               "application/json",
           },
+
           body: JSON.stringify(
             payload
           ),
@@ -403,79 +535,145 @@ async function generateAIPlan(
       const txt =
         await response.text();
 
-      throw new Error(
-        txt
-      );
+      throw new Error(txt);
     }
 
     aiReport =
       await response.json();
+
+    console.log(
+      "✅ ML RESPONSE:",
+      JSON.stringify(
+        aiReport,
+        null,
+        2
+      )
+    );
   } catch (error) {
     console.log(
-      "ML ERROR:",
+      "❌ ML ERROR:",
       error.message
     );
   }
 
-  /* -----------------------------------------
-     Fallback if ML fails
-  ----------------------------------------- */
-  if (!aiReport) {
+  /* ------------------------------------------------
+     FALLBACK REPORT
+  ------------------------------------------------ */
+
+  if (
+    !aiReport ||
+    !aiReport.recoveryCurve ||
+    aiReport.recoveryCurve.length === 0
+  ) {
+    console.log(
+      "⚠️ USING FALLBACK AI REPORT"
+    );
+
     aiReport = {
-      success: true,
       summary: {
-        predictedScore: 52,
-        successChance: 68,
+        totalDays: 18,
+        recoveryPercent: 82,
+        successChance: 76,
         riskLevel:
           "Moderate",
-        estimatedDays: 18,
-        recoveryPercent: 60,
       },
-      recoveryCurve: [
-        {
-          day: 1,
-          avgROM: 45,
+
+      recoveryCurve:
+        Array.from({
+          length: 25,
+        }).map((_, i) => ({
+          day: i + 1,
+          avgROM: 55 + i,
+          recoveryPercent:
+            40 + i * 2,
+        })),
+
+      daywisePlan:
+        Array.from({
+          length: 25,
+        }).map((_, i) => ({
+          day: i + 1,
+
+          phase:
+            i < 5
+              ? "Passive"
+              : i < 15
+              ? "Assistive"
+              : "Active",
+
+          avgROM: 55 + i,
+
+          repetitions: 15,
+
+          intensity:
+            "Moderate",
+        })),
+
+      jointSummary: {
+        index_mcp: {
+          normal_rom: 90,
+          starting_rom: 70,
+          deficit: 20,
         },
-        {
-          day: 5,
-          avgROM: 55,
+
+        middle_mcp: {
+          normal_rom: 90,
+          starting_rom: 65,
+          deficit: 25,
         },
-        {
-          day: 10,
-          avgROM: 65,
+
+        ring_mcp: {
+          normal_rom: 90,
+          starting_rom: 72,
+          deficit: 18,
         },
-      ],
-      jointAnalysis: [],
-      daywisePlan: [],
+
+        thumb_mcp: {
+          normal_rom: 60,
+          starting_rom: 45,
+          deficit: 15,
+        },
+      },
+
       modeDistribution:
         {
-          passive: 4,
-          assistive: 8,
-          active: 6,
+          Active: 10,
+          Assistive: 8,
+          Passive: 7,
         },
+
       warnings: [
-        "Fallback mode used.",
+        "Fallback AI report used",
       ],
     };
   }
 
-  const score =
+  aiReport =
+    normalizeAIReport(
+      aiReport
+    );
+
+  /* ------------------------------------------------
+     PLAN GENERATION
+  ------------------------------------------------ */
+
+  const recovery =
     num(
       aiReport.summary
-        ?.predictedScore,
-      55
+        ?.recovery_percent,
+      60
     );
 
   let intensity =
     "Moderate";
 
-  let repetitions = 15;
+  let repetitions = 18;
 
-  if (score >= 75) {
+  if (recovery >= 85) {
     intensity = "High";
-    repetitions = 22;
+    repetitions = 24;
   } else if (
-    score >= 55
+    recovery >= 60
   ) {
     intensity =
       "Moderate";
@@ -486,22 +684,46 @@ async function generateAIPlan(
   }
 
   const targetROM =
-    Math.round(score);
+    Math.round(
+      recovery
+    );
+
+  /* ------------------------------------------------
+     SAVE PLAN + AI REPORT
+  ------------------------------------------------ */
 
   const createdPlan =
     await prisma.therapyPlan.create({
       data: {
         patientId,
+
         intensity,
+
         repetitions,
+
         targetROM,
+
+        aiReport,
+
         isApproved: false,
+
         isFinalized: false,
+      },
+
+      include: {
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            diagnosis: true,
+          },
+        },
       },
     });
 
   return {
     ...createdPlan,
+
     aiReport,
   };
 }

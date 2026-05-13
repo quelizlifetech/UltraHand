@@ -1,22 +1,54 @@
 const svc = require("../services/patient.service");
 
+/* ---------------------------------------------------
+   SAFE SERIALIZER
+--------------------------------------------------- */
+function sanitizePatient(patient) {
+  if (!patient) return patient;
+
+  return {
+    ...patient,
+
+    plans: Array.isArray(patient.plans)
+      ? patient.plans.map((plan) => ({
+          ...plan,
+
+          aiReport:
+            plan.aiReport || null,
+        }))
+      : [],
+  };
+}
+
 /**
  * -----------------------------------
  * CREATE PATIENT (Doctor)
  * POST /api/patients
  * -----------------------------------
  */
-exports.create = async (req, res) => {
-  const data = await svc.createPatient(
-    req.user.id,
-    req.body
-  );
+exports.create = async (
+  req,
+  res
+) => {
+  const data =
+    await svc.createPatient(
+      req.user.id,
+      req.body
+    );
 
-  return res.status(201).json({
-    success: true,
-    message: "Patient created successfully",
-    patient: data,
-  });
+  return res
+    .status(201)
+    .json({
+      success: true,
+
+      message:
+        "Patient created successfully",
+
+      patient:
+        sanitizePatient(
+          data
+        ),
+    });
 };
 
 /**
@@ -25,15 +57,25 @@ exports.create = async (req, res) => {
  * GET /api/patients
  * -----------------------------------
  */
-exports.list = async (req, res) => {
-  const patients = await svc.listForDoctor(
-    req.user.id
-  );
+exports.list = async (
+  req,
+  res
+) => {
+  const patients =
+    await svc.listForDoctor(
+      req.user.id
+    );
 
   return res.json({
     success: true,
-    count: patients.length,
-    patients,
+
+    count:
+      patients.length,
+
+    patients:
+      patients.map(
+        sanitizePatient
+      ),
   });
 };
 
@@ -43,15 +85,23 @@ exports.list = async (req, res) => {
  * GET /api/patients/:id
  * -----------------------------------
  */
-exports.getOne = async (req, res) => {
-  const patient = await svc.getOne(
-    req.user.id,
-    req.params.id
-  );
+exports.getOne = async (
+  req,
+  res
+) => {
+  const patient =
+    await svc.getOne(
+      req.user.id,
+      req.params.id
+    );
 
   return res.json({
     success: true,
-    patient,
+
+    patient:
+      sanitizePatient(
+        patient
+      ),
   });
 };
 
@@ -61,17 +111,27 @@ exports.getOne = async (req, res) => {
  * PUT /api/patients/:id
  * -----------------------------------
  */
-exports.update = async (req, res) => {
-  const patient = await svc.updatePatient(
-    req.user.id,
-    req.params.id,
-    req.body
-  );
+exports.update = async (
+  req,
+  res
+) => {
+  const patient =
+    await svc.updatePatient(
+      req.user.id,
+      req.params.id,
+      req.body
+    );
 
   return res.json({
     success: true,
-    message: "Patient updated successfully",
-    patient,
+
+    message:
+      "Patient updated successfully",
+
+    patient:
+      sanitizePatient(
+        patient
+      ),
   });
 };
 
@@ -81,7 +141,10 @@ exports.update = async (req, res) => {
  * DELETE /api/patients/:id
  * -----------------------------------
  */
-exports.remove = async (req, res) => {
+exports.remove = async (
+  req,
+  res
+) => {
   await svc.removePatient(
     req.user.id,
     req.params.id
@@ -89,7 +152,9 @@ exports.remove = async (req, res) => {
 
   return res.json({
     success: true,
-    message: "Patient deleted successfully",
+
+    message:
+      "Patient deleted successfully",
   });
 };
 
@@ -99,13 +164,21 @@ exports.remove = async (req, res) => {
  * GET /api/patients/me
  * -----------------------------------
  */
-exports.me = async (req, res) => {
-  const patient = await svc.getByUserId(
-    req.user.id
-  );
+exports.me = async (
+  req,
+  res
+) => {
+  const patient =
+    await svc.getByUserId(
+      req.user.id
+    );
 
   return res.json({
     success: true,
-    patient,
+
+    patient:
+      sanitizePatient(
+        patient
+      ),
   });
 };

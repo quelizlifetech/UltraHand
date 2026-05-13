@@ -15,6 +15,7 @@ enum Role {
 enum HandSide {
   Left
   Right
+  Both
 }
 
 enum PatientStatus {
@@ -26,28 +27,23 @@ enum PatientStatus {
 enum TherapyMode {
   Active
   Passive
-  Assisted
+  Assistive
 }
 
 model User {
   id   String @id @default(cuid())
   name String
 
-  // Doctor uses email login
   email String? @unique
-
-  // Patient uses phone login
   phone String? @unique
 
   password String
   role     Role
 
-  // Force patient to change default password after first login
   mustChangePassword Boolean @default(false)
 
   createdAt DateTime @default(now())
 
-  // Relations
   patients       Patient[] @relation("DoctorPatients")
   patientProfile Patient?  @relation("PatientUser")
 
@@ -64,44 +60,47 @@ model Patient {
   diagnosis String
   category  String
   handSide  HandSide
-  status    PatientStatus @default(Active)
 
-  // Assigned doctor
+  status PatientStatus @default(Active)
+
   doctorId String
-  doctor   User   @relation("DoctorPatients", fields: [doctorId], references: [id])
+  doctor   User @relation("DoctorPatients", fields: [doctorId], references: [id])
 
-  // Linked patient login user account
   userId String? @unique
-  user   User?   @relation("PatientUser", fields: [userId], references: [id])
+  user   User? @relation("PatientUser", fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
 
   therapyConfig TherapyConfig?
   baselineROM   BaselineROM?
-  plans         TherapyPlan[]
-  sessions      Session[]
+
+  plans    TherapyPlan[]
+  sessions Session[]
 }
 
 model TherapyConfig {
   id String @id @default(cuid())
 
-  patientId String  @unique
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String @unique
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   sessionsPerDay  Int
   therapyMode     TherapyMode
   durationMinutes Int
-  affectedJoints  String[]
-  severityLevel   String
+
+  affectedJoints String[]
+
+  severityLevel String
 }
 
 model BaselineROM {
   id String @id @default(cuid())
 
-  patientId String  @unique
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String @unique
 
-  // Fingers
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
   index_mcp Float
   index_pip Float
   index_dip Float
@@ -118,11 +117,9 @@ model BaselineROM {
   little_pip Float
   little_dip Float
 
-  // Thumb
   thumb_mcp Float
   thumb_ip  Float
 
-  // Wrist
   wrist_flexion          Float
   wrist_extension        Float
   wrist_radial_deviation Float
@@ -133,11 +130,14 @@ model TherapyPlan {
   id String @id @default(cuid())
 
   patientId String
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   intensity   String
   repetitions Int
   targetROM   Float
+
+  aiReport Json?
 
   isApproved  Boolean @default(false)
   isFinalized Boolean @default(false)
@@ -149,13 +149,16 @@ model Session {
   id String @id @default(cuid())
 
   patientId String
-  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   date DateTime @default(now())
 
   painLevel Int
-  fatigue   Boolean @default(false)
-  notes     String?
+
+  fatigue Boolean @default(false)
+
+  notes String?
 
   metrics SessionMetric[]
 }
@@ -164,21 +167,24 @@ model SessionMetric {
   id String @id @default(cuid())
 
   sessionId String
-  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   jointName String
-  angle     Float
-  speed     Float
+
+  angle Float
+
+  speed Float
 }
 
 model Message {
   id String @id @default(cuid())
 
   senderId String
-  sender   User   @relation("Sender", fields: [senderId], references: [id])
+  sender User @relation("Sender", fields: [senderId], references: [id])
 
   receiverId String
-  receiver   User   @relation("Receiver", fields: [receiverId], references: [id])
+  receiver User @relation("Receiver", fields: [receiverId], references: [id])
 
   message String
 

@@ -3,12 +3,13 @@ const { z } = require("zod");
 /* ------------------------------
    COMMON HELPERS
 ------------------------------ */
-const angle = (min, max) => z.number().min(min).max(max);
+const angle = (min, max) =>
+  z.coerce.number().min(min).max(max);
 
 /* ------------------------------
-   BASELINE ROM
+   ML JOINTS SCHEMA
 ------------------------------ */
-const baselineROMSchema = z.object({
+const jointsSchema = z.object({
   index_mcp: angle(0, 90),
   index_pip: angle(0, 110),
   index_dip: angle(0, 90),
@@ -30,48 +31,51 @@ const baselineROMSchema = z.object({
 
   wrist_flexion: angle(0, 90),
   wrist_extension: angle(0, 80),
-  wrist_radial_deviation: angle(0, 25),
-  wrist_ulnar_deviation: angle(0, 40),
+
+  wrist_radial_dev: angle(0, 30),
+  wrist_ulnar_dev: angle(0, 45),
 });
 
 /* ------------------------------
-   THERAPY CONFIG
+   ML INPUT SCHEMA
 ------------------------------ */
-const therapyConfigSchema = z.object({
-  sessionsPerDay: z.number().int().min(1).max(8),
-
-  therapyMode: z.enum([
+const mlInputSchema = z.object({
+  therapy_mode: z.enum([
     "Active",
     "Passive",
-    "Assisted",
+    "Assistive",
+    "Mechanical",
   ]),
 
-  durationMinutes: z.number().int().min(5).max(120),
+  sessions_per_day: z.coerce.number().int().min(1).max(10),
 
-  affectedJoints: z.array(z.string().min(1)).min(1),
+  sessions_completed: z.coerce.number().int().min(0).max(100),
 
-  severityLevel: z.enum([
-    "Mild",
-    "Moderate",
-    "Severe",
-  ]),
+  session_duration: z.coerce.number().int().min(5).max(120),
+
+  repetitions_completed: z.coerce.number().int().min(1).max(500),
+
+  stiffness: z.coerce.number().int().min(1).max(5),
+
+  joints: jointsSchema,
 });
 
 /* ------------------------------
    CREATE PATIENT
 ------------------------------ */
 const createPatientSchema = z.object({
-  name: z.string().min(2).max(120),
+  name: z.string().trim().min(2).max(120),
 
-  age: z.number().int().min(0).max(120),
+  age: z.coerce.number().int().min(0).max(120),
 
-  diagnosis: z.string().min(2),
+  diagnosis: z.string().trim().min(2),
 
-  category: z.string().min(2),
+  category: z.string().trim().min(2),
 
   handSide: z.enum([
     "Left",
     "Right",
+    "Both",
   ]),
 
   status: z.enum([
@@ -80,9 +84,7 @@ const createPatientSchema = z.object({
     "Completed",
   ]).optional(),
 
-  therapyConfig: therapyConfigSchema,
-
-  baselineROM: baselineROMSchema,
+  ml_input: mlInputSchema,
 
   // Optional patient login account
   account: z.object({
@@ -94,10 +96,7 @@ const createPatientSchema = z.object({
 /* ------------------------------
    UPDATE PATIENT
 ------------------------------ */
-const updatePatientSchema = createPatientSchema.partial().extend({
-  therapyConfig: therapyConfigSchema.partial().optional(),
-  baselineROM: baselineROMSchema.partial().optional(),
-});
+const updatePatientSchema = createPatientSchema.partial();
 
 /* ------------------------------
    THERAPY PLAN
@@ -111,9 +110,9 @@ const planSchema = z.object({
     "High",
   ]),
 
-  repetitions: z.number().int().min(1).max(200),
+  repetitions: z.coerce.number().int().min(1).max(200),
 
-  targetROM: z.number().min(0).max(180),
+  targetROM: z.coerce.number().min(0).max(180),
 });
 
 /* ------------------------------
@@ -129,7 +128,7 @@ const sessionStartSchema = z.object({
 const sessionSaveSchema = z.object({
   patientId: z.string().min(1),
 
-  painLevel: z.number().int().min(0).max(10),
+  painLevel: z.coerce.number().int().min(0).max(10),
 
   fatigue: z.boolean().optional().default(false),
 
@@ -138,8 +137,10 @@ const sessionSaveSchema = z.object({
   metrics: z.array(
     z.object({
       jointName: z.string().min(1),
-      angle: z.number().min(0).max(180),
-      speed: z.number().min(0).max(500),
+
+      angle: z.coerce.number().min(0).max(180),
+
+      speed: z.coerce.number().min(0).max(500),
     })
   ).min(1),
 });
@@ -149,18 +150,20 @@ const sessionSaveSchema = z.object({
 ------------------------------ */
 const registerDoctorSchema = z.object({
   name: z.string().min(2),
+
   email: z.string().email(),
+
   password: z.string().min(6),
 });
 
 /* ------------------------------
    LOGIN
-   Doctor => email
-   Patient => phone
 ------------------------------ */
 const loginSchema = z.object({
   email: z.string().email().optional(),
+
   phone: z.string().min(10).max(15).optional(),
+
   password: z.string().min(1),
 }).refine(
   (data) => data.email || data.phone,
@@ -171,8 +174,8 @@ const loginSchema = z.object({
 );
 
 module.exports = {
-  baselineROMSchema,
-  therapyConfigSchema,
+  jointsSchema,
+  mlInputSchema,
   createPatientSchema,
   updatePatientSchema,
   planSchema,

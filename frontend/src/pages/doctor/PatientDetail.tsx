@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+
 import {
   ArrowLeft,
   Sparkles,
   Activity,
-  AlertTriangle,
   CheckCircle2,
-  MessageSquare,
   Pause,
   Play,
   ShieldCheck,
@@ -45,9 +44,79 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const COLORS = [
+  "#7c3aed",
+  "#3b82f6",
+  "#10b981",
+];
+
+/* =========================================
+   NORMALIZE ALL AI REPORT FORMATS
+========================================= */
+
+const normalizeReport = (
+  report: any
+) => {
+  if (!report) return null;
+
+  return {
+    summary: {
+      estimatedDays:
+        report?.summary
+          ?.estimatedDays ??
+        report?.summary
+          ?.estimated_days ??
+        0,
+
+      recoveryPercent:
+        report?.summary
+          ?.recoveryPercent ??
+        report?.summary
+          ?.recovery_percent ??
+        0,
+
+      successChance:
+        report?.summary
+          ?.successChance ??
+        report?.summary
+          ?.success_chance ??
+        0,
+
+      riskLevel:
+        report?.summary
+          ?.riskLevel ??
+        report?.summary
+          ?.risk_level ??
+        "Unknown",
+    },
+
+    recoveryCurve:
+      report.recoveryCurve ||
+      report.recovery_curve ||
+      [],
+
+    daywisePlan:
+      report.daywisePlan ||
+      report.daywise_plan ||
+      [],
+
+    jointAnalysis:
+      report.jointAnalysis ||
+      report.joint_analysis ||
+      [],
+
+    modeDistribution:
+      report.modeDistribution ||
+      report.mode_distribution ||
+      {},
+  };
+};
+
 export default function PatientDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
+
+  const navigate =
+    useNavigate();
 
   const [loading, setLoading] =
     useState(true);
@@ -73,10 +142,10 @@ export default function PatientDetail() {
   const [intensity, setIntensity] =
     useState("Moderate");
 
-  const [note, setNote] =
-    useState("");
+  /* =========================================
+     FETCH PATIENT
+  ========================================= */
 
-  /* -------------------------------- */
   const fetchPatient =
     async () => {
       try {
@@ -92,15 +161,11 @@ export default function PatientDetail() {
 
         setPatient(p);
 
-        if (
-          p?.plans?.length
-        ) {
+        if (p?.plans?.length) {
           const plan =
             p.plans[0];
 
-          setLatestPlan(
-            plan
-          );
+          setLatestPlan(plan);
 
           setReps(
             plan.repetitions ||
@@ -116,10 +181,16 @@ export default function PatientDetail() {
             plan.intensity ||
               "Moderate"
           );
+
+          if (plan.aiReport) {
+            setAiReport(
+              normalizeReport(
+                plan.aiReport
+              )
+            );
+          }
         }
-      } catch (
-        error: any
-      ) {
+      } catch (error: any) {
         toast.error(
           error.message
         );
@@ -132,7 +203,10 @@ export default function PatientDetail() {
     fetchPatient();
   }, [id]);
 
-  /* -------------------------------- */
+  /* =========================================
+     GENERATE AI PLAN
+  ========================================= */
+
   const generateAIPlan =
     async () => {
       try {
@@ -146,15 +220,13 @@ export default function PatientDetail() {
         const plan =
           res.plan || res;
 
-        setLatestPlan(
-          plan
-        );
+        setLatestPlan(plan);
 
-        if (
-          plan.aiReport
-        ) {
+        if (plan.aiReport) {
           setAiReport(
-            plan.aiReport
+            normalizeReport(
+              plan.aiReport
+            )
           );
         }
 
@@ -173,9 +245,9 @@ export default function PatientDetail() {
         toast.success(
           "AI plan generated"
         );
-      } catch (
-        error: any
-      ) {
+
+        await fetchPatient();
+      } catch (error: any) {
         toast.error(
           error.message
         );
@@ -184,7 +256,10 @@ export default function PatientDetail() {
       }
     };
 
-  /* -------------------------------- */
+  /* =========================================
+     SAVE PLAN
+  ========================================= */
+
   const savePlan =
     async () => {
       try {
@@ -193,10 +268,8 @@ export default function PatientDetail() {
           {
             patientId: id,
             intensity,
-            repetitions:
-              reps,
-            targetROM:
-              target,
+            repetitions: reps,
+            targetROM: target,
           }
         );
 
@@ -205,50 +278,16 @@ export default function PatientDetail() {
         );
 
         fetchPatient();
-      } catch (
-        error: any
-      ) {
+      } catch (error: any) {
         toast.error(
           error.message
         );
       }
     };
 
-  const approvePlan =
-    async () => {
-      if (
-        !latestPlan?.id
-      )
-        return;
-
-      await api.post(
-        `/plans/${latestPlan.id}/approve`
-      );
-
-      toast.success(
-        "Approved"
-      );
-
-      fetchPatient();
-    };
-
-  const finalizePlan =
-    async () => {
-      if (
-        !latestPlan?.id
-      )
-        return;
-
-      await api.post(
-        `/plans/${latestPlan.id}/finalize`
-      );
-
-      toast.success(
-        "Finalized"
-      );
-
-      fetchPatient();
-    };
+  /* =========================================
+     LOADING
+  ========================================= */
 
   if (loading) {
     return (
@@ -266,62 +305,118 @@ export default function PatientDetail() {
     );
   }
 
+  /* =========================================
+     SUMMARY
+  ========================================= */
+
   const summary =
-    aiReport?.summary ||
-    {};
+    aiReport?.summary || {};
+
+  /* =========================================
+     RECOVERY CURVE
+  ========================================= */
 
   const recoveryCurve =
-    aiReport?.recoveryCurve ||
-    [];
+    (
+      aiReport?.recoveryCurve ||
+      []
+    ).map((item: any) => ({
+      day:
+        item.day || 0,
+
+      avgROM:
+        item.avgROM ??
+        item.avg_rom ??
+        0,
+
+      recoveryPercent:
+        item.recoveryPercent ??
+        item.recovery_percent ??
+        0,
+    }));
+
+  /* =========================================
+     RECOVERY LOOKUP
+  ========================================= */
+
+  const recoveryByDay =
+    Object.fromEntries(
+      recoveryCurve.map(
+        (item: any) => [
+          item.day,
+          item.recoveryPercent,
+        ]
+      )
+    );
+
+  /* =========================================
+     DAYWISE PLAN
+  ========================================= */
 
   const daywise =
-    aiReport?.daywisePlan ||
-    [];
+    (
+      aiReport?.daywisePlan ||
+      []
+    ).map((row: any) => ({
+      day:
+        row.day || 0,
+
+      mode:
+        row.mode ||
+        row.phase ||
+        "Unknown",
+
+      avgROM:
+        row.avgROM ??
+        row.avg_rom ??
+        0,
+
+      recoveryPercent:
+        recoveryByDay[
+          row.day
+        ] || 0,
+    }));
+
+  /* =========================================
+     JOINT ANALYSIS
+  ========================================= */
 
   const jointData =
-    aiReport?.jointAnalysis?.map(
-      (j: any) => ({
-        name:
-          j.joint,
-        gain:
-          j.gain,
-      })
-    ) || [];
+    (
+      aiReport?.jointAnalysis ||
+      []
+    ).map((item: any) => ({
+      joint:
+        item.joint ||
+        "Unknown",
+
+      gain:
+        item.gain ??
+        item.improvement ??
+        0,
+    }));
+
+  /* =========================================
+     MODE DISTRIBUTION
+  ========================================= */
 
   const modeData =
-    aiReport
-      ?.modeDistribution
-      ? [
-          {
-            name:
-              "Passive",
-            value:
-              aiReport
-                .modeDistribution
-                .passive,
-          },
-          {
-            name:
-              "Assistive",
-            value:
-              aiReport
-                .modeDistribution
-                .assistive,
-          },
-          {
-            name:
-              "Active",
-            value:
-              aiReport
-                .modeDistribution
-                .active,
-          },
-        ]
-      : [];
+    Object.entries(
+      aiReport?.modeDistribution ||
+        {}
+    ).map(
+      ([key, value]) => ({
+        name: key,
+        value:
+          Number(value) ||
+          0,
+      })
+    );
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* HEADER */}
+
       <button
         onClick={() =>
           navigate(
@@ -342,21 +437,17 @@ export default function PatientDetail() {
 
           <p className="text-sm text-muted-foreground mt-1">
             {patient.age} yrs ·{" "}
-            {
-              patient.handSide
-            }{" "}
-            hand
+            {patient.handSide} hand
           </p>
         </div>
 
-        <div className="px-3 py-1 rounded-full text-xs bg-success-soft text-success h-fit">
-          {
-            patient.status
-          }
+        <div className="px-3 py-1 rounded-full text-xs bg-green-100 text-green-700 h-fit">
+          {patient.status}
         </div>
       </div>
 
-      {/* Controls */}
+      {/* CONTROLS */}
+
       <section className="clinical-card p-6 space-y-4">
         <h2 className="font-semibold">
           Therapy Plan Control
@@ -369,9 +460,7 @@ export default function PatientDetail() {
             </Label>
 
             <Select
-              value={
-                intensity
-              }
+              value={intensity}
               onValueChange={
                 setIntensity
               }
@@ -384,9 +473,11 @@ export default function PatientDetail() {
                 <SelectItem value="Low">
                   Low
                 </SelectItem>
+
                 <SelectItem value="Moderate">
                   Moderate
                 </SelectItem>
+
                 <SelectItem value="High">
                   High
                 </SelectItem>
@@ -396,44 +487,35 @@ export default function PatientDetail() {
 
           <div>
             <Label>
-              Repetitions:
-              {reps}
+              Repetitions: {reps}
             </Label>
 
             <Slider
               min={1}
               max={30}
-              value={[
-                reps,
-              ]}
+              value={[reps]}
               onValueChange={(
                 v
               ) =>
-                setReps(
-                  v[0]
-                )
+                setReps(v[0])
               }
             />
           </div>
 
           <div>
             <Label>
-              Target ROM:
+              Target ROM:{" "}
               {target}°
             </Label>
 
             <Slider
               min={10}
               max={100}
-              value={[
-                target,
-              ]}
+              value={[target]}
               onValueChange={(
                 v
               ) =>
-                setTarget(
-                  v[0]
-                )
+                setTarget(v[0])
               }
             />
           </div>
@@ -444,21 +526,18 @@ export default function PatientDetail() {
             onClick={
               generateAIPlan
             }
-            disabled={
-              aiLoading
-            }
+            disabled={aiLoading}
             className="bg-violet-600 text-white"
           >
             <Sparkles className="h-4 w-4 mr-2" />
+
             {aiLoading
               ? "Generating..."
               : "Generate AI Plan"}
           </Button>
 
           <Button
-            onClick={
-              savePlan
-            }
+            onClick={savePlan}
           >
             <CheckCircle2 className="h-4 w-4 mr-2" />
             Save Manual
@@ -476,98 +555,29 @@ export default function PatientDetail() {
         </div>
       </section>
 
-      {/* Latest Plan */}
-      {latestPlan && (
-        <section className="clinical-card p-6 border border-violet-500/30">
-          <h2 className="font-semibold mb-4">
-            Latest Plan
-          </h2>
-
-          <div className="grid md:grid-cols-4 gap-4">
-            <Field
-              label="Intensity"
-              value={
-                latestPlan.intensity
-              }
-            />
-            <Field
-              label="Repetitions"
-              value={String(
-                latestPlan.repetitions
-              )}
-            />
-            <Field
-              label="Target ROM"
-              value={`${latestPlan.targetROM}°`}
-            />
-            <Field
-              label="Status"
-              value={
-                latestPlan.isFinalized
-                  ? "Finalized"
-                  : latestPlan.isApproved
-                  ? "Approved"
-                  : "Pending"
-              }
-            />
-          </div>
-
-          <div className="flex gap-2 mt-4">
-            {!latestPlan.isApproved && (
-              <Button
-                variant="outline"
-                onClick={
-                  approvePlan
-                }
-              >
-                Approve
-              </Button>
-            )}
-
-            {latestPlan.isApproved &&
-              !latestPlan.isFinalized && (
-                <Button
-                  variant="outline"
-                  onClick={
-                    finalizePlan
-                  }
-                >
-                  Finalize
-                </Button>
-              )}
-          </div>
-        </section>
-      )}
-
       {/* AI REPORT */}
+
       {aiReport && (
         <>
-          {/* Summary */}
           <div className="grid md:grid-cols-4 gap-4">
             <Stat
               label="Estimated Days"
               value={String(
                 summary.estimatedDays
               )}
-              icon={
-                Clock3
-              }
+              icon={Clock3}
             />
 
             <Stat
               label="Recovery %"
               value={`${summary.recoveryPercent}%`}
-              icon={
-                TrendingUp
-              }
+              icon={TrendingUp}
             />
 
             <Stat
               label="Success Chance"
               value={`${summary.successChance}%`}
-              icon={
-                ShieldCheck
-              }
+              icon={ShieldCheck}
             />
 
             <Stat
@@ -575,140 +585,78 @@ export default function PatientDetail() {
               value={
                 summary.riskLevel
               }
-              icon={
-                Activity
-              }
+              icon={Activity}
             />
           </div>
 
-          {/* Curve */}
+          {/* RECOVERY CURVE */}
+
           <section className="clinical-card p-6">
             <h2 className="font-semibold mb-4">
-              Daily Avg ROM Prediction
+              Recovery Curve
             </h2>
 
-            <div className="h-72">
-              <ResponsiveContainer>
+            <div
+              style={{
+                width: "100%",
+                minWidth: 300,
+                height: 400,
+              }}
+            >
+              <ResponsiveContainer
+                width="99%"
+                height="100%"
+              >
                 <LineChart
                   data={
                     recoveryCurve
                   }
                 >
                   <CartesianGrid strokeDasharray="3 3" />
+
                   <XAxis dataKey="day" />
+
                   <YAxis />
+
                   <Tooltip />
-                  <Legend />
 
                   <Line
                     type="monotone"
                     dataKey="avgROM"
-                    stroke="hsl(var(--primary))"
+                    stroke="#3b82f6"
                     strokeWidth={3}
-                    name="Avg ROM"
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </section>
 
-          {/* Gains */}
+          {/* DAYWISE REPORT */}
+
           <section className="clinical-card p-6">
             <h2 className="font-semibold mb-4">
-              Joint Improvement Prediction
-            </h2>
-
-            <div className="h-80">
-              <ResponsiveContainer>
-                <BarChart
-                  data={
-                    jointData
-                  }
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-
-                  <Bar
-                    dataKey="gain"
-                    fill="hsl(var(--primary))"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-
-          {/* Pie */}
-          <section className="clinical-card p-6">
-            <h2 className="font-semibold mb-4">
-              Therapy Phase Split
-            </h2>
-
-            <div className="h-72">
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie
-                    data={
-                      modeData
-                    }
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={110}
-                    label
-                  >
-                    {modeData.map(
-                      (
-                        _: any,
-                        i: number
-                      ) => (
-                        <Cell
-                          key={i}
-                          fill={`hsl(${220 + i * 60} 70% 55%)`}
-                        />
-                      )
-                    )}
-                  </Pie>
-
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-
-          {/* Day Wise Table */}
-          <section className="clinical-card p-6">
-            <h2 className="font-semibold mb-4">
-              Day Wise Therapy Prediction
+              Daywise Therapy
+              Report
             </h2>
 
             <div className="overflow-auto">
-              <table className="w-full text-sm min-w-[900px]">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2">
+                    <th className="text-left py-2">
                       Day
                     </th>
-                    <th className="text-left p-2">
-                      Phase
+
+                    <th className="text-left py-2">
+                      Mode
                     </th>
-                    <th className="text-left p-2">
-                      Intensity
+
+                    <th className="text-left py-2">
+                      ROM
                     </th>
-                    <th className="text-left p-2">
-                      Reps
-                    </th>
-                    <th className="text-left p-2">
-                      Avg ROM
-                    </th>
-                    <th className="text-left p-2">
-                      Wrist Flex
-                    </th>
-                    <th className="text-left p-2">
-                      Wrist Ext
-                    </th>
-                    <th className="text-left p-2">
-                      Index MCP
+
+                    <th className="text-left py-2">
+                      Recovery %
                     </th>
                   </tr>
                 </thead>
@@ -716,57 +664,37 @@ export default function PatientDetail() {
                 <tbody>
                   {daywise.map(
                     (
-                      row: any
+                      row: any,
+                      idx: number
                     ) => (
                       <tr
-                        key={
-                          row.day
-                        }
-                        className="border-b hover:bg-muted/40"
+                        key={idx}
+                        className="border-b"
                       >
-                        <td className="p-2">
+                        <td className="py-2">
                           {
                             row.day
                           }
                         </td>
-                        <td className="p-2">
+
+                        <td className="py-2">
                           {
-                            row.phase
+                            row.mode
                           }
                         </td>
-                        <td className="p-2">
-                          {
-                            row.intensity
-                          }
-                        </td>
-                        <td className="p-2">
-                          {
-                            row.repetitions
-                          }
-                        </td>
-                        <td className="p-2">
+
+                        <td className="py-2">
                           {
                             row.avgROM
                           }
                           °
                         </td>
-                        <td className="p-2">
+
+                        <td className="py-2">
                           {
-                            row.wrist_flexion
+                            row.recoveryPercent
                           }
-                          °
-                        </td>
-                        <td className="p-2">
-                          {
-                            row.wrist_extension
-                          }
-                          °
-                        </td>
-                        <td className="p-2">
-                          {
-                            row.index_mcp
-                          }
-                          °
+                          %
                         </td>
                       </tr>
                     )
@@ -776,93 +704,102 @@ export default function PatientDetail() {
             </div>
           </section>
 
-          {/* Warning */}
-          {aiReport
-            ?.warnings
-            ?.length >
-            0 && (
-            <section className="clinical-card p-6 border border-destructive/30">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                <h2 className="font-semibold">
-                  AI Warnings
-                </h2>
-              </div>
+          {/* JOINT ANALYSIS */}
 
-              <div className="space-y-2 text-sm">
-                {aiReport.warnings.map(
-                  (
-                    w: string,
-                    i: number
-                  ) => (
-                    <div
-                      key={
-                        i
-                      }
-                    >
-                      •{" "}
-                      {
-                        w
-                      }
-                    </div>
-                  )
-                )}
-              </div>
-            </section>
-          )}
+          <section className="clinical-card p-6">
+            <h2 className="font-semibold mb-4">
+              Joint Recovery
+            </h2>
+
+            <div
+              style={{
+                width: "100%",
+                minWidth: 300,
+                height: 400,
+              }}
+            >
+              <ResponsiveContainer
+                width="99%"
+                height="100%"
+              >
+                <BarChart
+                  data={jointData}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+
+                  <XAxis dataKey="joint" />
+
+                  <YAxis />
+
+                  <Tooltip />
+
+                  <Bar
+                    dataKey="gain"
+                    fill="#7c3aed"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
+          {/* THERAPY MODE */}
+
+          <section className="clinical-card p-6">
+            <h2 className="font-semibold mb-4">
+              Therapy Mode
+              Distribution
+            </h2>
+
+            <div
+              style={{
+                width: "100%",
+                minWidth: 300,
+                height: 400,
+              }}
+            >
+              <ResponsiveContainer
+                width="99%"
+                height="100%"
+              >
+                <PieChart>
+                  <Pie
+                    data={modeData}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={
+                      120
+                    }
+                    label
+                  >
+                    {modeData.map(
+                      (
+                        _: any,
+                        index: number
+                      ) => (
+                        <Cell
+                          key={
+                            index
+                          }
+                          fill={
+                            COLORS[
+                              index %
+                                COLORS.length
+                            ]
+                          }
+                        />
+                      )
+                    )}
+                  </Pie>
+
+                  <Tooltip />
+
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
         </>
       )}
-
-      {/* Notes */}
-      <section className="clinical-card p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <MessageSquare className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold">
-            Notes To Patient
-          </h2>
-        </div>
-
-        <textarea
-          rows={4}
-          value={
-            note
-          }
-          onChange={(
-            e
-          ) =>
-            setNote(
-              e.target
-                .value
-            )
-          }
-          className="w-full rounded-xl border bg-background p-3 text-sm"
-          placeholder="Write note..."
-        />
-
-        <div className="flex justify-end mt-3">
-          <Button>
-            Send
-          </Button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-/* -------------------------------- */
-function Field({
-  label,
-  value,
-}: any) {
-  return (
-    <div>
-      <div className="text-xs text-muted-foreground">
-        {label}
-      </div>
-
-      <div className="font-medium mt-1">
-        {value}
-      </div>
     </div>
   );
 }
