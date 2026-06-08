@@ -2,21 +2,26 @@
 CREATE TYPE "Role" AS ENUM ('doctor', 'patient');
 
 -- CreateEnum
-CREATE TYPE "HandSide" AS ENUM ('Left', 'Right');
+CREATE TYPE "HandSide" AS ENUM ('Left', 'Right', 'Both');
 
 -- CreateEnum
 CREATE TYPE "PatientStatus" AS ENUM ('Active', 'Recovering', 'Completed');
 
 -- CreateEnum
-CREATE TYPE "TherapyMode" AS ENUM ('Active', 'Passive', 'Assisted');
+CREATE TYPE "TherapyMode" AS ENUM ('Mechanical Stimulation', 'Passive', 'Assistive', 'Active');
+
+-- CreateEnum
+CREATE TYPE "SessionStatus" AS ENUM ('Scheduled', 'Completed', 'Skipped', 'InProgress');
 
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
+    "email" TEXT,
+    "phone" TEXT,
     "password" TEXT NOT NULL,
     "role" "Role" NOT NULL,
+    "mustChangePassword" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
@@ -85,9 +90,14 @@ CREATE TABLE "TherapyPlan" (
     "intensity" TEXT NOT NULL,
     "repetitions" INTEGER NOT NULL,
     "targetROM" DOUBLE PRECISION NOT NULL,
+    "aiReport" JSONB,
     "isApproved" BOOLEAN NOT NULL DEFAULT false,
     "isFinalized" BOOLEAN NOT NULL DEFAULT false,
+    "totalDays" INTEGER NOT NULL DEFAULT 0,
+    "startedAt" TIMESTAMP(3),
+    "completedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "TherapyPlan_pkey" PRIMARY KEY ("id")
 );
@@ -95,11 +105,19 @@ CREATE TABLE "TherapyPlan" (
 -- CreateTable
 CREATE TABLE "Session" (
     "id" TEXT NOT NULL,
+    "planId" TEXT NOT NULL,
     "patientId" TEXT NOT NULL,
+    "dayInPlan" INTEGER NOT NULL,
+    "status" "SessionStatus" NOT NULL DEFAULT 'Completed',
     "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "painLevel" INTEGER NOT NULL,
+    "therapyMode" "TherapyMode",
+    "avgROM" DOUBLE PRECISION,
+    "recoveryPercent" DOUBLE PRECISION,
+    "painLevel" INTEGER NOT NULL DEFAULT 0,
     "fatigue" BOOLEAN NOT NULL DEFAULT false,
     "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
 );
@@ -111,6 +129,8 @@ CREATE TABLE "SessionMetric" (
     "jointName" TEXT NOT NULL,
     "angle" DOUBLE PRECISION NOT NULL,
     "speed" DOUBLE PRECISION NOT NULL,
+    "targetAngle" DOUBLE PRECISION,
+    "withinTarget" BOOLEAN,
 
     CONSTRAINT "SessionMetric_pkey" PRIMARY KEY ("id")
 );
@@ -121,6 +141,7 @@ CREATE TABLE "Message" (
     "senderId" TEXT NOT NULL,
     "receiverId" TEXT NOT NULL,
     "message" TEXT NOT NULL,
+    "isRead" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Message_pkey" PRIMARY KEY ("id")
@@ -128,6 +149,9 @@ CREATE TABLE "Message" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_phone_key" ON "User"("phone");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Patient_patientId_key" ON "Patient"("patientId");
@@ -140,6 +164,27 @@ CREATE UNIQUE INDEX "TherapyConfig_patientId_key" ON "TherapyConfig"("patientId"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "BaselineROM_patientId_key" ON "BaselineROM"("patientId");
+
+-- CreateIndex
+CREATE INDEX "TherapyPlan_patientId_idx" ON "TherapyPlan"("patientId");
+
+-- CreateIndex
+CREATE INDEX "Session_patientId_idx" ON "Session"("patientId");
+
+-- CreateIndex
+CREATE INDEX "Session_planId_idx" ON "Session"("planId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Session_planId_dayInPlan_key" ON "Session"("planId", "dayInPlan");
+
+-- CreateIndex
+CREATE INDEX "SessionMetric_sessionId_idx" ON "SessionMetric"("sessionId");
+
+-- CreateIndex
+CREATE INDEX "Message_senderId_idx" ON "Message"("senderId");
+
+-- CreateIndex
+CREATE INDEX "Message_receiverId_idx" ON "Message"("receiverId");
 
 -- AddForeignKey
 ALTER TABLE "Patient" ADD CONSTRAINT "Patient_doctorId_fkey" FOREIGN KEY ("doctorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -155,6 +200,9 @@ ALTER TABLE "BaselineROM" ADD CONSTRAINT "BaselineROM_patientId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "TherapyPlan" ADD CONSTRAINT "TherapyPlan_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Session" ADD CONSTRAINT "Session_planId_fkey" FOREIGN KEY ("planId") REFERENCES "TherapyPlan"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Session" ADD CONSTRAINT "Session_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE CASCADE ON UPDATE CASCADE;

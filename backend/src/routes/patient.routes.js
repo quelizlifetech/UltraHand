@@ -9,14 +9,28 @@ const {
 } = require("../utils/validators");
 
 /* --------------------------------------------------
-   PATIENT SELF ROUTE
-   Logged in patient can fetch own profile
+   PATIENT SELF ROUTES
+   Logged-in patient can fetch + update own profile
 ---------------------------------------------------*/
 router.get(
   "/me",
   authenticate,
   authorize("patient"),
   asyncHandler(ctrl.me)
+);
+
+router.post(
+  "/me/profile",
+  authenticate,
+  authorize("patient"),
+  asyncHandler(ctrl.updateOwnProfile)
+);
+
+router.post(
+  "/me/change-password",
+  authenticate,
+  authorize("patient"),
+  asyncHandler(ctrl.changeOwnPassword)
 );
 
 /* --------------------------------------------------
@@ -30,15 +44,9 @@ router.post(
   asyncHandler(ctrl.create)
 );
 
-router.get(
-  "/",
-  asyncHandler(ctrl.list)
-);
+router.get("/", asyncHandler(ctrl.list));
 
-router.get(
-  "/:id",
-  asyncHandler(ctrl.getOne)
-);
+router.get("/:id", asyncHandler(ctrl.getOne));
 
 router.put(
   "/:id",
@@ -46,9 +54,6 @@ router.put(
   asyncHandler(ctrl.update)
 );
 
-router.delete(
-  "/:id",
-  asyncHandler(ctrl.remove)
-);
+router.delete("/:id", asyncHandler(ctrl.remove));
 
 module.exports = router;

@@ -5,13 +5,18 @@ import {
   Bell,
   LogOut,
   AlertTriangle,
+  User as UserIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuthStore } from "@/store/authStore";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
@@ -19,6 +24,7 @@ const navItems = [
   { to: "/doctor", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/doctor/patients", label: "Patients", icon: Users },
   { to: "/doctor/alerts", label: "Alerts", icon: Bell },
+  { to: "/doctor/profile", label: "My Profile", icon: UserIcon },
 ];
 
 type PatientItem = {
@@ -35,9 +41,11 @@ export default function DoctorLayout() {
 
   const [patients, setPatients] = useState<PatientItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profilePhoto, setProfilePhoto] = useState<string>("");
 
   useEffect(() => {
     loadPatients();
+    loadProfilePhoto();
   }, []);
 
   const loadPatients = async () => {
@@ -50,6 +58,18 @@ export default function DoctorLayout() {
       setPatients([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProfilePhoto = async () => {
+    try {
+      const res = await api.get("/doctor/profile");
+      if (res.profile?.profilePhoto) {
+        setProfilePhoto(res.profile.profilePhoto);
+      }
+    } catch (error) {
+      // Silently fail — profile may not exist yet
+      console.warn("Could not load profile photo:", error);
     }
   };
 
@@ -111,8 +131,17 @@ export default function DoctorLayout() {
 
         {/* Footer User */}
         <div className="p-3 border-t border-sidebar-border space-y-2">
-          <div className="flex items-center gap-3 px-3 py-2">
+          <NavLink
+            to="/doctor/profile"
+            className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-sidebar-accent/60 transition-colors"
+          >
             <Avatar className="h-8 w-8">
+              {profilePhoto ? (
+                <AvatarImage
+                  src={profilePhoto}
+                  alt={user?.name || "Doctor"}
+                />
+              ) : null}
               <AvatarFallback className="bg-primary-soft text-primary text-xs font-semibold">
                 {initials}
               </AvatarFallback>
@@ -126,7 +155,7 @@ export default function DoctorLayout() {
                 {user?.email}
               </div>
             </div>
-          </div>
+          </NavLink>
 
           <Button
             variant="ghost"

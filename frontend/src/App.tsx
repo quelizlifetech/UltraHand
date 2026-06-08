@@ -9,6 +9,7 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Login from "./pages/Login";
 import RegisterDoctor from "./pages/RegisterDoctor";
+import ForgotPassword from "./pages/ForgotPassword";
 
 import { RoleGuard } from "@/components/RoleGuard";
 
@@ -18,12 +19,15 @@ import PatientsList from "./pages/doctor/PatientsList";
 import AddPatient from "./pages/doctor/AddPatient";
 import PatientDetail from "./pages/doctor/PatientDetail";
 import Alerts from "./pages/doctor/Alerts";
+import DoctorProfileSetup from "./pages/doctor/DoctorProfileSetup";
+import DoctorProfile from "./pages/doctor/DoctorProfile";
 
 import PatientLayout from "@/components/layout/PatientLayout";
 import PatientHome from "./pages/patient/Home";
 import Session from "./pages/patient/Session";
 import Progress from "./pages/patient/Progress";
 import Medications from "./pages/patient/Medications";
+import PatientProfile from "./pages/patient/PatientProfile";
 
 const queryClient = new QueryClient();
 
@@ -38,12 +42,20 @@ const App = () => (
           {/* Public Routes */}
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register-doctor" element={<RegisterDoctor />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+
+          {/* Doctor Profile Setup — STANDALONE (no DoctorLayout) */}
           <Route
-            path="/register-doctor"
-            element={<RegisterDoctor />}
+            path="/doctor/profile-setup"
+            element={
+              <RoleGuard role="doctor">
+                <DoctorProfileSetup />
+              </RoleGuard>
+            }
           />
 
-          {/* Doctor Routes */}
+          {/* Doctor Routes (with sidebar layout) */}
           <Route
             path="/doctor"
             element={
@@ -52,30 +64,12 @@ const App = () => (
               </RoleGuard>
             }
           >
-            <Route
-              index
-              element={<DoctorOverview />}
-            />
-
-            <Route
-              path="patients"
-              element={<PatientsList />}
-            />
-
-            <Route
-              path="patients/new"
-              element={<AddPatient />}
-            />
-
-            <Route
-              path="patients/:id"
-              element={<PatientDetail />}
-            />
-
-            <Route
-              path="alerts"
-              element={<Alerts />}
-            />
+            <Route index element={<DoctorOverview />} />
+            <Route path="patients" element={<PatientsList />} />
+            <Route path="patients/new" element={<AddPatient />} />
+            <Route path="patients/:id" element={<PatientDetail />} />
+            <Route path="alerts" element={<Alerts />} />
+            <Route path="profile" element={<DoctorProfile />} />
           </Route>
 
           {/* Patient Routes */}
@@ -87,32 +81,15 @@ const App = () => (
               </RoleGuard>
             }
           >
-            <Route
-              index
-              element={<PatientHome />}
-            />
-
-            <Route
-              path="session"
-              element={<Session />}
-            />
-
-            <Route
-              path="progress"
-              element={<Progress />}
-            />
-
-            <Route
-              path="medications"
-              element={<Medications />}
-            />
+            <Route index element={<PatientHome />} />
+            <Route path="session" element={<Session />} />
+            <Route path="progress" element={<Progress />} />
+            <Route path="medications" element={<Medications />} />
+            <Route path="profile" element={<PatientProfile />} />
           </Route>
 
           {/* Not Found */}
-          <Route
-            path="*"
-            element={<NotFound />}
-          />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

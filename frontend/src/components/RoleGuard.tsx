@@ -15,7 +15,6 @@ export const RoleGuard = ({
   const loading = useAuthStore((s) => s.loading);
   const location = useLocation();
 
-  // While auth state is loading
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
@@ -24,7 +23,6 @@ export const RoleGuard = ({
     );
   }
 
-  // Not logged in
   if (!user) {
     return (
       <Navigate
@@ -35,18 +33,31 @@ export const RoleGuard = ({
     );
   }
 
-  // Wrong role trying to access another dashboard
   if (user.role !== role) {
     return (
       <Navigate
-        to={
-          user.role === "doctor"
-            ? "/doctor"
-            : "/patient"
-        }
+        to={user.role === "doctor" ? "/doctor" : "/patient"}
         replace
       />
     );
+  }
+
+  // 🩺 Doctor must complete profile setup on first login.
+  if (
+    role === "doctor" &&
+    user.mustSetupProfile &&
+    !location.pathname.startsWith("/doctor/profile-setup")
+  ) {
+    return <Navigate to="/doctor/profile-setup" replace />;
+  }
+
+  // 🧑‍⚕️ Patient must change default password on first login.
+  if (
+    role === "patient" &&
+    user.mustChangePassword &&
+    !location.pathname.startsWith("/patient/profile")
+  ) {
+    return <Navigate to="/patient/profile" replace />;
   }
 
   return <>{children}</>;

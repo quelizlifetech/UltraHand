@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================
+// ENUMS
+// ============================================================
+
 enum Role {
   doctor
   patient
@@ -25,10 +29,22 @@ enum PatientStatus {
 }
 
 enum TherapyMode {
-  Active
+  Mechanical_Stimulation @map("Mechanical Stimulation")
   Passive
   Assistive
+  Active
 }
+
+enum SessionStatus {
+  Scheduled
+  Completed
+  Skipped
+  InProgress
+}
+
+// ============================================================
+// USER
+// ============================================================
 
 model User {
   id   String @id @default(cuid())
@@ -41,15 +57,56 @@ model User {
   role     Role
 
   mustChangePassword Boolean @default(false)
+  mustSetupProfile   Boolean @default(false)
+
+  firstName    String?
+  lastName     String?
+  profilePhoto String? @db.Text
+
+  // 🆕 EMAIL CHANGE TRACKING
+  // First time setting email = 1, each subsequent edit increments.
+  // After reaching 5, emailLocked becomes true. Doctor can unlock.
+  emailChangeCount Int     @default(0)
+  emailLocked      Boolean @default(false)
 
   createdAt DateTime @default(now())
 
   patients       Patient[] @relation("DoctorPatients")
   patientProfile Patient?  @relation("PatientUser")
+  doctorProfile  DoctorProfile?
 
   sentMessages     Message[] @relation("Sender")
   receivedMessages Message[] @relation("Receiver")
 }
+
+// ============================================================
+// DOCTOR PROFILE
+// ============================================================
+
+model DoctorProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  username  String  @unique
+  firstName String
+  lastName  String
+
+  occupation String?
+
+  profilePhoto String? @db.Text
+
+  clinicName     String?
+  clinicLocation String?
+  clinicTimings  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================================
+// PATIENT
+// ============================================================
 
 model Patient {
   id        String @id @default(cuid())
@@ -64,10 +121,10 @@ model Patient {
   status PatientStatus @default(Active)
 
   doctorId String
-  doctor   User @relation("DoctorPatients", fields: [doctorId], references: [id])
+  doctor   User   @relation("DoctorPatients", fields: [doctorId], references: [id])
 
   userId String? @unique
-  user   User? @relation("PatientUser", fields: [userId], references: [id])
+  user   User?   @relation("PatientUser", fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
 
@@ -78,12 +135,14 @@ model Patient {
   sessions Session[]
 }
 
+// ============================================================
+// THERAPY CONFIG
+// ============================================================
+
 model TherapyConfig {
-  id String @id @default(cuid())
-
-  patientId String @unique
-
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  patientId String  @unique
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   sessionsPerDay  Int
   therapyMode     TherapyMode
@@ -94,12 +153,14 @@ model TherapyConfig {
   severityLevel String
 }
 
+// ============================================================
+// BASELINE ROM
+// ============================================================
+
 model BaselineROM {
-  id String @id @default(cuid())
-
-  patientId String @unique
-
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  patientId String  @unique
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   index_mcp Float
   index_pip Float
@@ -126,12 +187,15 @@ model BaselineROM {
   wrist_ulnar_deviation  Float
 }
 
+// ============================================================
+// THERAPY PLAN
+// ============================================================
+
 model TherapyPlan {
   id String @id @default(cuid())
 
   patientId String
-
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   intensity   String
   repetitions Int
@@ -142,51 +206,99 @@ model TherapyPlan {
   isApproved  Boolean @default(false)
   isFinalized Boolean @default(false)
 
+  totalDays Int @default(0)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+
+  @@index([patientId])
 }
+
+// ============================================================
+// SESSION
+// ============================================================
 
 model Session {
   id String @id @default(cuid())
 
-  patientId String
+  planId String
+  plan   TherapyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
-  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  dayInPlan Int
+
+  status SessionStatus @default(Completed)
 
   date DateTime @default(now())
 
-  painLevel Int
+  therapyMode TherapyMode?
 
-  fatigue Boolean @default(false)
+  avgROM          Float?
+  recoveryPercent Float?
+
+  painLevel Int     @default(0)
+  fatigue   Boolean @default(false)
 
   notes String?
 
   metrics SessionMetric[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([planId, dayInPlan])
+  @@index([patientId])
+  @@index([planId])
 }
+
+// ============================================================
+// SESSION METRIC
+// ============================================================
 
 model SessionMetric {
   id String @id @default(cuid())
 
   sessionId String
-
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   jointName String
 
   angle Float
-
   speed Float
+
+  targetAngle Float?
+
+  withinTarget Boolean?
+
+  @@index([sessionId])
 }
+
+// ============================================================
+// MESSAGE
+// ============================================================
 
 model Message {
   id String @id @default(cuid())
 
   senderId String
-  sender User @relation("Sender", fields: [senderId], references: [id])
+  sender   User   @relation("Sender", fields: [senderId], references: [id])
 
   receiverId String
-  receiver User @relation("Receiver", fields: [receiverId], references: [id])
+  receiver   User   @relation("Receiver", fields: [receiverId], references: [id])
 
   message String
 
+  isRead Boolean @default(false)
+
   createdAt DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
 }

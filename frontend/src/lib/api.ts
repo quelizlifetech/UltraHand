@@ -6,64 +6,40 @@ const BASE_URL =
    TOKEN HELPERS
 ========================================= */
 
-const TOKEN_KEY =
-  "ultrahand-token";
+const TOKEN_KEY = "ultrahand-token";
 
 export function getToken():
   | string
   | null {
-  return localStorage.getItem(
-    TOKEN_KEY
-  );
+  return localStorage.getItem(TOKEN_KEY);
 }
 
 export function setToken(
   token: string
 ): void {
-  localStorage.setItem(
-    TOKEN_KEY,
-    token
-  );
+  localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function removeToken(): void {
-  localStorage.removeItem(
-    TOKEN_KEY
-  );
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 /* =========================================
    TRANSFORM → FRONTEND → ML FORMAT
 ========================================= */
 
-function transformPatientToML(
-  data: any
-) {
+function transformPatientToML(data: any) {
   return {
     ...data,
-
-    diagnosis:
-      String(
-        data.diagnosis
-      ),
-
-    category:
-      String(
-        data.category
-      ),
-
+    diagnosis: String(data.diagnosis),
+    category: String(data.category),
     ml_input: {
       ...data.ml_input,
-
-      therapy_mode:
-        String(
-          data.ml_input
-            ?.therapy_mode
-        ),
-
+      therapy_mode: String(
+        data.ml_input?.therapy_mode
+      ),
       joints: {
-        ...data.ml_input
-          ?.joints,
+        ...data.ml_input?.joints,
       },
     },
   };
@@ -71,147 +47,138 @@ function transformPatientToML(
 
 /* =========================================
    NORMALIZE ANALYTICS
+   ────────────────────────────────────────
+   Preserves ALL fields the backend sends.
+   Only adds fallbacks for the most common
+   fields — does not strip anything.
 ========================================= */
 
-function normalizeAnalytics(
-  analytics: any
-) {
-  if (!analytics)
-    return null;
+function normalizeAnalytics(analytics: any) {
+  if (!analytics) return null;
+
+  const s =
+    analytics.summary ||
+    analytics.metrics ||
+    {};
 
   return {
+    // Preserve everything the backend sends
     ...analytics,
 
-    /* =====================
-       SUMMARY
-    ===================== */
+    // Then enrich the summary with all expected fields
+    // (fallbacks ensure nothing is undefined)
     summary: {
+      // Spread original summary first so all fields are kept
+      ...s,
+
+      // Timeline
       estimated_days:
-        analytics.summary
-          ?.estimated_days ??
-        analytics.summary
-          ?.estimatedDays ??
-        analytics.metrics
-          ?.estimated_days ??
+        s.estimated_days ??
+        s.estimatedDays ??
+        s.totalDays ??
         0,
 
+      target_reached_day:
+        s.target_reached_day ??
+        s.targetReachedDay ??
+        null,
+
+      // ROM metrics
+      current_avg_rom:
+        s.current_avg_rom ??
+        s.currentAvgROM ??
+        0,
+
+      target_avg_rom:
+        s.target_avg_rom ??
+        s.targetAvgROM ??
+        0,
+
+      final_avg_rom:
+        s.final_avg_rom ??
+        s.finalAvgROM ??
+        0,
+
+      // Recovery — clearly labeled
+      baseline_recovery_percent:
+        s.baseline_recovery_percent ??
+        s.baselineRecoveryPercent ??
+        0,
+
+      predicted_recovery_percent:
+        s.predicted_recovery_percent ??
+        s.predictedRecoveryPercent ??
+        0,
+
+      final_rom_percent:
+        s.final_rom_percent ??
+        s.finalROMPercent ??
+        0,
+
+      // Backward-compatible alias
       recovery_percent:
-        analytics.summary
-          ?.recovery_percent ??
-        analytics.summary
-          ?.recoveryPercent ??
-        analytics.metrics
-          ?.recovery_percent ??
+        s.recovery_percent ??
+        s.recoveryPercent ??
+        s.predicted_recovery_percent ??
+        s.predictedRecoveryPercent ??
         0,
 
+      // Risk + success
       success_chance:
-        analytics.summary
-          ?.success_chance ??
-        analytics.summary
-          ?.successChance ??
-        analytics.metrics
-          ?.success_chance ??
+        s.success_chance ??
+        s.successChance ??
         0,
 
       risk_level:
-        analytics.summary
-          ?.risk_level ??
-        analytics.summary
-          ?.riskLevel ??
-        analytics.metrics
-          ?.risk_level ??
+        s.risk_level ||
+        s.riskLevel ||
         "Unknown",
     },
 
-    /* =====================
-       RECOVERY CURVE
-    ===================== */
+    // Preserve arrays — backend may send camelCase OR snake_case
     recovery_curve:
-      analytics
-        ?.recovery_curve ||
-      analytics
-        ?.recoveryCurve ||
-      analytics
-        ?.rom_prediction ||
+      analytics.recovery_curve ||
+      analytics.recoveryCurve ||
+      analytics.rom_prediction ||
       [],
 
-    /* =====================
-       DAYWISE REPORT
-    ===================== */
     daywise_plan:
-      analytics
-        ?.daywise_plan ||
-      analytics
-        ?.daywisePlan ||
-      analytics
-        ?.daily_report ||
+      analytics.daywise_plan ||
+      analytics.daywisePlan ||
+      analytics.daily_report ||
       [],
 
-    /* =====================
-       JOINT ANALYSIS
-    ===================== */
     joint_analysis:
-      analytics
-        ?.joint_analysis ||
-      analytics
-        ?.jointAnalysis ||
-      analytics
-        ?.joint_improvement ||
+      analytics.joint_analysis ||
+      analytics.jointAnalysis ||
+      analytics.joint_improvement ||
       [],
 
-    /* =====================
-       THERAPY MODES
-    ===================== */
     mode_distribution:
-      analytics
-        ?.mode_distribution ||
-      analytics
-        ?.modeDistribution ||
-      analytics
-        ?.therapy_phase_split ||
+      analytics.mode_distribution ||
+      analytics.modeDistribution ||
+      analytics.therapy_phase_split ||
       {},
 
-    /* =====================
-       SESSION PLAN
-    ===================== */
     session_plan:
-      analytics
-        ?.session_plan ||
-      analytics
-        ?.sessionPlan ||
+      analytics.session_plan ||
+      analytics.sessionPlan ||
       [],
 
-    /* =====================
-       FATIGUE
-    ===================== */
     fatigue_summary:
-      analytics
-        ?.fatigue_summary ||
-      analytics
-        ?.fatigueSummary ||
+      analytics.fatigue_summary ||
+      analytics.fatigueSummary ||
       {},
 
-    /* =====================
-       ROM FORECAST
-    ===================== */
     rom_prediction:
-      analytics
-        ?.rom_prediction ||
-      analytics
-        ?.romPrediction ||
+      analytics.rom_prediction ||
+      analytics.romPrediction ||
       [],
 
-    /* =====================
-       WARNINGS
-    ===================== */
-    warnings:
-      analytics
-        ?.warnings ||
-      [],
+    journey: analytics.journey || [],
 
-    /* =====================
-       RAW
-    ===================== */
+    warnings: analytics.warnings || [],
+
     raw: analytics,
   };
 }
@@ -220,72 +187,38 @@ function normalizeAnalytics(
    RESPONSE NORMALIZER
 ========================================= */
 
-function normalizeResponse(
-  data: any
-) {
-  if (!data)
-    return data;
+function normalizeResponse(data: any) {
+  if (!data) return data;
 
-  const normalized = {
-    ...data,
-  };
+  const normalized = { ...data };
 
-  /* =====================================
-     DIRECT PLAN
-  ===================================== */
-
-  if (
-    normalized.aiReport
-  ) {
+  if (normalized.aiReport) {
     normalized.aiReport =
       normalizeAnalytics(
         normalized.aiReport
       );
   }
 
-  /* =====================================
-     PLAN.aiReport
-  ===================================== */
-
-  if (
-    normalized.plan
-      ?.aiReport
-  ) {
+  if (normalized.plan?.aiReport) {
     normalized.plan.aiReport =
       normalizeAnalytics(
-        normalized.plan
-          .aiReport
+        normalized.plan.aiReport
       );
   }
 
-  /* =====================================
-     PATIENT PLANS
-  ===================================== */
-
-  if (
-    normalized.patient
-      ?.plans
-  ) {
+  if (normalized.patient?.plans) {
     normalized.patient.plans =
       normalized.patient.plans.map(
         (plan: any) => ({
           ...plan,
-
-          aiReport:
-            normalizeAnalytics(
-              plan.aiReport
-            ),
+          aiReport: normalizeAnalytics(
+            plan.aiReport
+          ),
         })
       );
   }
 
-  /* =====================================
-     RAW ANALYTICS
-  ===================================== */
-
-  if (
-    normalized.analytics
-  ) {
+  if (normalized.analytics) {
     normalized.analytics =
       normalizeAnalytics(
         normalized.analytics
@@ -312,9 +245,7 @@ interface RequestOptions {
   auth?: boolean;
 }
 
-async function request<
-  T = any
->(
+async function request<T = any>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
@@ -324,68 +255,55 @@ async function request<
     auth = true,
   } = options;
 
-  const token =
-    getToken();
+  const token = getToken();
 
-  const headers: Record<
-    string,
-    string
-  > = {
-    Accept:
-      "application/json",
+  const headers: Record<string, string> = {
+    Accept: "application/json",
   };
 
   if (data) {
-    headers[
-      "Content-Type"
-    ] =
+    headers["Content-Type"] =
       "application/json";
   }
 
   if (auth && token) {
-    headers[
-      "Authorization"
-    ] = `Bearer ${token}`;
+    headers["Authorization"] =
+      `Bearer ${token}`;
   }
 
-  const response =
-    await fetch(
-      `${BASE_URL}${endpoint}`,
-      {
-        method,
-        headers,
+  const response = await fetch(
+    `${BASE_URL}${endpoint}`,
+    {
+      method,
+      headers,
+      body: data
+        ? JSON.stringify(data)
+        : undefined,
+    }
+  );
 
-        body: data
-          ? JSON.stringify(
-              data
-            )
-          : undefined,
-      }
-    );
-
-  let result: any =
-    null;
+  let result: any = null;
 
   const contentType =
-    response.headers.get(
-      "content-type"
-    );
+    response.headers.get("content-type");
 
   if (
     contentType?.includes(
       "application/json"
     )
   ) {
-    result =
-      await response.json();
+    result = await response.json();
   } else {
-    result =
-      await response.text();
+    result = await response.text();
   }
 
+  // Only clear token when an authenticated
+  // request is rejected — protects against
+  // 401s from public endpoints (login etc.)
   if (
-    response.status ===
-    401
+    response.status === 401 &&
+    auth &&
+    token
   ) {
     removeToken();
   }
@@ -395,15 +313,10 @@ async function request<
       result?.error ||
       result?.message ||
       `Request failed (${response.status})`;
-
-    throw new Error(
-      message
-    );
+    throw new Error(message);
   }
 
-  return normalizeResponse(
-    result
-  );
+  return normalizeResponse(result);
 }
 
 /* =========================================
@@ -415,33 +328,21 @@ export const api = {
     url: string,
     auth = true
   ) =>
-    request<T>(url, {
-      method: "GET",
-      auth,
-    }),
+    request<T>(url, { method: "GET", auth }),
 
   post: <T = any>(
     url: string,
     data?: any,
     auth = true
   ) => {
-    if (
-      url === "/patients"
-    ) {
-      data =
-        transformPatientToML(
-          data
-        );
+    if (url === "/patients") {
+      data = transformPatientToML(data);
     }
-
-    return request<T>(
-      url,
-      {
-        method: "POST",
-        data,
-        auth,
-      }
-    );
+    return request<T>(url, {
+      method: "POST",
+      data,
+      auth,
+    });
   },
 
   put: <T = any>(
@@ -481,45 +382,38 @@ export const api = {
 ========================================= */
 
 export const authApi = {
-  registerDoctor: (
-    data: {
-      name: string;
-      email: string;
-      password: string;
-    }
-  ) =>
+  registerDoctor: (data: {
+    name: string;
+    email: string;
+    password: string;
+  }) =>
     api.post(
       "/auth/register-doctor",
       data,
       false
     ),
 
-  loginDoctor: (
-    data: {
-      email: string;
-      password: string;
-    }
-  ) =>
+  loginDoctor: (data: {
+    email: string;
+    password: string;
+  }) =>
     api.post(
       "/auth/login",
       data,
       false
     ),
 
-  loginPatient: (
-    data: {
-      phone: string;
-      password: string;
-    }
-  ) =>
+  loginPatient: (data: {
+    phone: string;
+    password: string;
+  }) =>
     api.post(
       "/auth/login",
       data,
       false
     ),
 
-  me: () =>
-    api.get("/auth/me"),
+  me: () => api.get("/auth/me"),
 };
 
 /* =========================================
@@ -527,35 +421,17 @@ export const authApi = {
 ========================================= */
 
 export const patientApi = {
-  list: () =>
-    api.get("/patients"),
+  list: () => api.get("/patients"),
 
-  getById: (
-    id: string
-  ) =>
-    api.get(
-      `/patients/${id}`
-    ),
+  getById: (id: string) =>
+    api.get(`/patients/${id}`),
 
   create: (data: any) =>
-    api.post(
-      "/patients",
-      data
-    ),
+    api.post("/patients", data),
 
-  update: (
-    id: string,
-    data: any
-  ) =>
-    api.put(
-      `/patients/${id}`,
-      data
-    ),
+  update: (id: string, data: any) =>
+    api.put(`/patients/${id}`, data),
 
-  remove: (
-    id: string
-  ) =>
-    api.delete(
-      `/patients/${id}`
-    ),
+  remove: (id: string) =>
+    api.delete(`/patients/${id}`),
 };
