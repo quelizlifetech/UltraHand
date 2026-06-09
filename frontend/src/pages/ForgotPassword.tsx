@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Mail,
-  Lock,
   ArrowLeft,
   Check,
   X,
@@ -37,7 +36,7 @@ const evaluatePassword = (pw: string) => {
     return {
       score: 0,
       label: "",
-      color: "bg-slate-200",
+      color: "bg-muted",
       hints: [] as string[],
     };
   }
@@ -95,8 +94,8 @@ function StageIndicator({ stage }: { stage: 1 | 2 | 3 }) {
               stage > s.num
                 ? "bg-emerald-500 text-white"
                 : stage === s.num
-                ? "bg-violet-600 text-white ring-4 ring-violet-100"
-                : "bg-slate-200 text-slate-500"
+                ? "bg-violet-600 text-white ring-4 ring-violet-500/20"
+                : "bg-muted text-muted-foreground"
             }`}
           >
             {stage > s.num ? (
@@ -108,8 +107,8 @@ function StageIndicator({ stage }: { stage: 1 | 2 | 3 }) {
           <span
             className={`text-xs font-medium ${
               stage >= s.num
-                ? "text-slate-900"
-                : "text-slate-400"
+                ? "text-foreground"
+                : "text-muted-foreground"
             }`}
           >
             {s.label}
@@ -117,9 +116,7 @@ function StageIndicator({ stage }: { stage: 1 | 2 | 3 }) {
           {i < stages.length - 1 && (
             <div
               className={`w-8 h-[2px] mx-1 ${
-                stage > s.num
-                  ? "bg-emerald-500"
-                  : "bg-slate-200"
+                stage > s.num ? "bg-emerald-500" : "bg-muted"
               }`}
             />
           )}
@@ -153,7 +150,6 @@ function OtpInput({
     const newVal = arr.join("").trimEnd();
     onChange(newVal);
 
-    // Auto-advance
     if (clean && idx < 5) {
       inputsRef.current[idx + 1]?.focus();
     }
@@ -206,7 +202,7 @@ function OtpInput({
           onKeyDown={(e) => handleKey(i, e)}
           onPaste={handlePaste}
           disabled={disabled}
-          className="w-12 h-14 text-center text-xl font-semibold rounded-xl border-2 border-slate-200 focus:border-violet-500 focus:outline-none focus:ring-4 focus:ring-violet-100 transition-all disabled:bg-slate-50 disabled:text-slate-400"
+          className="w-12 h-14 text-center text-xl font-semibold rounded-xl border-2 border-border bg-background text-foreground focus:border-violet-500 focus:outline-none focus:ring-4 focus:ring-violet-500/20 transition-all disabled:bg-muted disabled:text-muted-foreground"
         />
       ))}
     </div>
@@ -230,7 +226,6 @@ export default function ForgotPassword() {
 
   const [showNew, setShowNew] = useState(false);
 
-  // Resend timer
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
@@ -243,11 +238,7 @@ export default function ForgotPassword() {
     }
   }, [resendCooldown]);
 
-  /* VALIDATIONS */
-  const emailValid = useMemo(
-    () => isValidEmail(email),
-    [email]
-  );
+  const emailValid = useMemo(() => isValidEmail(email), [email]);
   const otpValid = otp.length === 6;
   const passwordStrength = useMemo(
     () => evaluatePassword(newPassword),
@@ -257,7 +248,6 @@ export default function ForgotPassword() {
     newPassword && newPassword === confirmPassword;
   const passwordStrongEnough = passwordStrength.score >= 3;
 
-  /* ─── STAGE 1: REQUEST OTP ───────────────── */
   const handleRequestOtp = async () => {
     if (!emailValid) {
       toast.error("Please enter a valid email");
@@ -277,7 +267,6 @@ export default function ForgotPassword() {
     }
   };
 
-  /* ─── RESEND OTP ─────────────────────────── */
   const handleResendOtp = async () => {
     if (resendCooldown > 0) return;
     try {
@@ -293,7 +282,6 @@ export default function ForgotPassword() {
     }
   };
 
-  /* ─── STAGE 2: VERIFY OTP ────────────────── */
   const handleVerifyOtp = async () => {
     if (!otpValid) {
       toast.error("Enter the 6-digit code");
@@ -312,7 +300,6 @@ export default function ForgotPassword() {
     }
   };
 
-  /* ─── STAGE 3: RESET PASSWORD ────────────── */
   const handleResetPassword = async () => {
     if (!passwordStrongEnough) {
       toast.error("Password is too weak");
@@ -332,23 +319,21 @@ export default function ForgotPassword() {
       toast.success("Password reset successfully!");
       setTimeout(() => navigate("/login"), 1500);
     } catch (error: any) {
-      toast.error(
-        error.message || "Failed to reset password"
-      );
+      toast.error(error.message || "Failed to reset password");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* HEADER */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 mb-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-500/10 text-violet-600 dark:text-violet-400 mb-4">
             <KeyRound className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Reset your password
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
@@ -360,7 +345,7 @@ export default function ForgotPassword() {
         <StageIndicator stage={stage} />
 
         {/* CARD */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="bg-card text-card-foreground rounded-2xl p-6 shadow-sm border border-border">
           {/* ─────── STAGE 1: EMAIL ─────── */}
           {stage === 1 && (
             <div className="space-y-4">
@@ -385,7 +370,9 @@ export default function ForgotPassword() {
                   placeholder="you@example.com"
                   autoFocus
                   onKeyDown={(e) =>
-                    e.key === "Enter" && emailValid && handleRequestOtp()
+                    e.key === "Enter" &&
+                    emailValid &&
+                    handleRequestOtp()
                   }
                 />
               </div>
@@ -416,7 +403,7 @@ export default function ForgotPassword() {
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
                   We sent a 6-digit code to{" "}
-                  <span className="font-medium text-slate-700">
+                  <span className="font-medium text-foreground">
                     {email}
                   </span>
                 </p>
@@ -451,7 +438,7 @@ export default function ForgotPassword() {
                 <button
                   onClick={handleResendOtp}
                   disabled={resendCooldown > 0 || loading}
-                  className="text-xs text-violet-600 hover:text-violet-700 disabled:text-muted-foreground disabled:no-underline hover:underline"
+                  className="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 disabled:text-muted-foreground disabled:no-underline hover:underline"
                 >
                   {resendCooldown > 0
                     ? `Resend OTP in ${resendCooldown}s`
@@ -459,16 +446,18 @@ export default function ForgotPassword() {
                 </button>
               </div>
 
-              <button
-                onClick={() => {
-                  setStage(1);
-                  setOtp("");
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 mx-auto block"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                Use a different email
-              </button>
+              <div className="text-center">
+                <button
+                  onClick={() => {
+                    setStage(1);
+                    setOtp("");
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  Use a different email
+                </button>
+              </div>
             </div>
           )}
 
@@ -519,7 +508,7 @@ export default function ForgotPassword() {
                           className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
                             i <= passwordStrength.score
                               ? passwordStrength.color
-                              : "bg-slate-200"
+                              : "bg-muted"
                           }`}
                         />
                       ))}
@@ -528,8 +517,8 @@ export default function ForgotPassword() {
                       <span
                         className={
                           passwordStrength.score >= 3
-                            ? "text-emerald-600 font-medium"
-                            : "text-amber-600 font-medium"
+                            ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                            : "text-amber-600 dark:text-amber-400 font-medium"
                         }
                       >
                         {passwordStrength.label}
@@ -567,8 +556,8 @@ export default function ForgotPassword() {
                       <span
                         className={`flex items-center justify-center w-5 h-5 rounded-full ${
                           passwordsMatch
-                            ? "bg-emerald-100"
-                            : "bg-red-100"
+                            ? "bg-emerald-500/10"
+                            : "bg-red-500/10"
                         }`}
                       >
                         {passwordsMatch ? (
