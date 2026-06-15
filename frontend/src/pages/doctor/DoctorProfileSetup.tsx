@@ -151,6 +151,8 @@ export default function DoctorProfileSetup() {
   const [clinicLocation, setClinicLocation] = useState("");
   const [clinicTimings, setClinicTimings] = useState("");
 
+  // 🆕 Password change is now OPTIONAL
+  // Doctor can either skip these or fill all 3 to change password
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -193,12 +195,19 @@ export default function DoctorProfileSetup() {
     emailValid &&
     phoneValid;
 
+  // 🆕 Password section is "in progress" if user has typed in ANY password field
+  const passwordTouched =
+    !!currentPassword || !!newPassword || !!confirmPassword;
+
+  // 🆕 If user is changing password, all 3 fields must be valid
   const passwordValid =
     currentPassword.length > 0 &&
     passwordStrongEnough &&
     passwordsMatch;
 
-  const allValid = profileValid && passwordValid;
+  // 🆕 Form valid if profile is valid AND
+  // either password is untouched (skip) OR all 3 password fields are valid (change)
+  const allValid = profileValid && (!passwordTouched || passwordValid);
 
   /* PHOTO UPLOAD + RESIZE */
   const handlePhotoChange = (
@@ -261,10 +270,13 @@ export default function DoctorProfileSetup() {
     try {
       setLoading(true);
 
-      await api.post("/doctor/change-password", {
-        currentPassword,
-        newPassword,
-      });
+      // 🆕 Only call change-password API if doctor filled the password fields
+      if (passwordTouched && passwordValid) {
+        await api.post("/doctor/change-password", {
+          currentPassword,
+          newPassword,
+        });
+      }
 
       await api.post("/doctor/profile", {
         username,
@@ -532,12 +544,20 @@ export default function DoctorProfileSetup() {
           </div>
         </section>
 
-        {/* PASSWORD CHANGE */}
+        {/* PASSWORD CHANGE — NOW OPTIONAL */}
         <section className="clinical-card p-6 mb-6 space-y-4">
-          <h2 className="font-semibold flex items-center gap-2">
-            <Lock className="w-4 h-4" />
-            Change Password <span className="text-red-500">*</span>
-          </h2>
+          <div>
+            <h2 className="font-semibold flex items-center gap-2">
+              <Lock className="w-4 h-4" />
+              Change Password
+              <span className="text-xs font-normal text-muted-foreground ml-1">
+                (Optional)
+              </span>
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Leave blank to keep your current password. Fill all 3 fields to set a new one.
+            </p>
+          </div>
 
           <div>
             <Label>Current Password</Label>
