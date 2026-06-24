@@ -7,41 +7,36 @@
 # UltraHand — Repository Overview
 
 ### High-Level Purpose
-The UltraHand repository appears to house an ML service primarily focused on machine learning-driven patient therapy planning and management. Its objective is to define and apply machine learning models, generate adaptive therapy plans based on patient recovery, and manage related session data.
+The `UltraHand` repository, based on the provided frontend components, appears to be focused on building a client-side application with a strong emphasis on responsive user interface design and consistent notification mechanisms. Its primary objective is to deliver a dynamic and adaptable user experience.
 
 ### Architectural Structure
-The repository is structured with a distinct `ml-service` directory, indicating a modular component dedicated to machine learning operations. Within this service, an explicit separation of concerns is observed:
-*   **Configuration Layer**: Handled by `config.py`, centralizing all static parameters.
-*   **Data Access Layer**: Managed by `db_service.py`, abstracting persistence operations.
-This structure suggests that other ML-specific logic (e.g., model training, prediction, therapy plan generation) would reside within this `ml-service` and utilize these foundational modules.
+The repository structure, as inferred from the available files, indicates a frontend-centric architecture, specifically within a React ecosystem. The `frontend/src/hooks` directory suggests an organization pattern that promotes reusable, encapsulated logic for UI concerns. This implies a modular approach to client-side development, where common functionalities are abstracted into custom hooks.
 
 ### Core Components
-*   **Configuration Module (`ml-service/config.py`)**: Defines all operational parameters for the ML service, including dataset paths, model storage, feature engineering specifications, joint angle analysis parameters, and detailed, phase-based therapy mode progression rules.
-*   **Database Service Module (`ml-service/db_service.py`)**: Provides an interface for interacting with a persistence layer, primarily for patient session data. It is currently implemented in a "stub mode" for development, simulating database operations without an active connection.
+*   **Responsive UI Utilities**: The `use-mobile` hook provides a mechanism for components to react to viewport size changes, enabling responsive layouts and content adaptation.
+*   **Global Toast Notification System**: The `use-toast` hook and associated utilities implement a global, singleton state management pattern for displaying transient UI notifications (toasts), ensuring consistent messaging across the application.
 
 ### Interaction & Data Flow
-Components within the `ml-service` are designed to interact as follows:
-*   Other ML processing or therapy generation modules (not detailed in the provided summaries) import and consume parameters from the `config.py` module.
-*   These modules also interact with the `db_service.py` module to store new patient session data or retrieve existing records.
-*   In its current stubbed state, `db_service.py` logs operations and returns default empty data, preventing actual data persistence or retrieval. The overall flow is driven by the ML service's core logic, which is configured by `config.py` and uses `db_service.py` for data persistence.
+At a high level, components within the frontend application consume the provided hooks. The `useIsMobile` hook provides reactive state updates based on browser viewport dimensions. The `useToast` hook allows components to imperatively trigger toast notifications, which are then managed by a global state store using a dispatch-reducer pattern. This global state updates subscribed components, leading to reactive rendering of toasts.
 
 ### Technology Stack
-*   **Core Language**: Python.
-*   **Data Manipulation**: `pandas` is used for handling tabular data, particularly for representing fetched session records.
-*   **Logging**: The standard `logging` module is integrated for operational insights and debugging.
-*   **Planned Persistence**: Future integration with `PostgreSQL` via the `psycopg2` adapter is indicated for robust data storage.
+The project primarily utilizes:
+*   **React**: For building the user interface, leveraging custom hooks (`useState`, `useEffect`).
+*   **TypeScript**: Ensuring type safety and improving developer experience across the codebase.
+*   **Browser APIs**: Specifically `window.matchMedia` and `window.innerWidth` for responsive design logic.
+*   **Internal UI Components**: Indicated by imports like `@/components/ui/toast`, suggesting a reliance on a local or shared UI component library.
 
 ### Design Observations
-*   **Centralized Configuration**: The `config.py` file consolidates all service parameters, promoting consistency and ease of management.
-*   **Abstracted Data Access**: `db_service.py` provides a clean separation between business logic and data persistence, facilitating database changes or mock implementations.
-*   **Development-Friendly Stubbing**: The "stub mode" in `db_service.py` allows for local development and testing of the ML service without requiring a live PostgreSQL instance, though it implies that actual database interaction logic is not yet fully tested.
-*   **Granular Therapy Planning**: The detailed structure for `THERAPY_MODE_PROGRESSION` and `MODE_INTENSITY_STEPS` in `config.py` reflects an intention for highly adaptive and personalized patient therapy plans.
-*   **Future-Proofing**: The commented-out database configurations and `psycopg2` imports clearly outline a planned migration to a persistent PostgreSQL backend.
+The design prioritizes client-side performance and maintainability through:
+*   **Efficient Responsive Design**: Using `window.matchMedia` for responsive logic avoids less performant `resize` event listeners.
+*   **Centralized State Management for Toasts**: A custom global singleton store for toasts centralizes notification logic, reducing prop drilling and ensuring consistency.
+*   **Predictable State Transitions**: The use of a reducer pattern for toast state management promotes predictable updates, although the `use-toast` implementation notes side effects within the reducer.
+*   **Controlled Toast Visibility**: The `TOAST_LIMIT` of 1 for toasts suggests a design choice to minimize UI clutter by allowing only one toast to be visible at a time, with an emphasis on explicit dismissal.
 
 ### System Diagram
-
 ```mermaid
 graph TD
-MLServiceCore[MLServiceCoreLogic] --> ConfigModule[ConfigurationModule]
-MLServiceCore[MLServiceCoreLogic] --> DBServiceModule[DBServiceModule]
+A[FrontendApplication] --> B[UseMobileHook]
+A --> C[UseToastHook]
+C --> D[GlobalToastState]
 ```
