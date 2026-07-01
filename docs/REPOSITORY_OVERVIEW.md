@@ -7,36 +7,55 @@
 # UltraHand — Repository Overview
 
 ### High-Level Purpose
-The `UltraHand` repository, based on the provided frontend components, appears to be focused on building a client-side application with a strong emphasis on responsive user interface design and consistent notification mechanisms. Its primary objective is to deliver a dynamic and adaptable user experience.
+The UltraHand repository appears to implement a backend system designed for managing healthcare-related data, specifically focusing on user authentication (doctors), patient management, and an alert system. Its primary objective is to provide API endpoints for these functionalities, supporting interactions between medical staff and patient data.
 
 ### Architectural Structure
-The repository structure, as inferred from the available files, indicates a frontend-centric architecture, specifically within a React ecosystem. The `frontend/src/hooks` directory suggests an organization pattern that promotes reusable, encapsulated logic for UI concerns. This implies a modular approach to client-side development, where common functionalities are abstracted into custom hooks.
+The repository exhibits a clear layered backend architecture, primarily structured around:
+*   `backend/src/controllers`: Handles incoming HTTP requests, extracts data, and delegates business logic.
+*   `backend/src/services`: Encapsulates core business logic and interacts with data storage (inferred).
+
+This structure promotes separation of concerns, with controllers managing the request/response cycle and services handling domain-specific operations.
 
 ### Core Components
-*   **Responsive UI Utilities**: The `use-mobile` hook provides a mechanism for components to react to viewport size changes, enabling responsive layouts and content adaptation.
-*   **Global Toast Notification System**: The `use-toast` hook and associated utilities implement a global, singleton state management pattern for displaying transient UI notifications (toasts), ensuring consistent messaging across the application.
+The primary subsystems identified are:
+*   **Authentication Module:** Manages user registration (doctors), login, current user retrieval, and a multi-step password reset process involving OTP verification.
+*   **Alert Management Module:** Provides functionalities to retrieve alerts, specifically tailored for authenticated doctors and individual patients.
 
 ### Interaction & Data Flow
-At a high level, components within the frontend application consume the provided hooks. The `useIsMobile` hook provides reactive state updates based on browser viewport dimensions. The `useToast` hook allows components to imperatively trigger toast notifications, which are then managed by a global state store using a dispatch-reducer pattern. This global state updates subscribed components, leading to reactive rendering of toasts.
+Clients (e.g., a frontend application) initiate HTTP requests to the backend. These requests are routed to specific controller functions (e.g., `auth.controller.js`, `alert.controller.js`). The controllers:
+1.  Receive the HTTP request.
+2.  Extract relevant data (e.g., request body, URL parameters, user ID from authentication middleware).
+3.  Delegate the core business logic to the corresponding service layer module (e.g., `auth.service`, `alert.service`).
+4.  Await the result from the service.
+5.  Format the response (typically JSON) and send it back to the client.
+
+The service layer is responsible for executing business rules, interacting with data persistence, and returning processed data or status to the controllers.
 
 ### Technology Stack
-The project primarily utilizes:
-*   **React**: For building the user interface, leveraging custom hooks (`useState`, `useEffect`).
-*   **TypeScript**: Ensuring type safety and improving developer experience across the codebase.
-*   **Browser APIs**: Specifically `window.matchMedia` and `window.innerWidth` for responsive design logic.
-*   **Internal UI Components**: Indicated by imports like `@/components/ui/toast`, suggesting a reliance on a local or shared UI component library.
+Based on the JavaScript files and common backend patterns:
+*   **Runtime:** Node.js (inferred from `.js` files and `async/await` usage).
+*   **Language:** JavaScript (ESNext features like `async/await`).
+*   **Framework:** An HTTP server framework (e.g., Express.js, though not explicitly stated, is common for this pattern).
+*   **Authentication:** Relies on an implicit authentication middleware to populate `req.user.id`.
+*   **Password Reset:** Implements a token-based (OTP) multi-step password recovery mechanism.
 
 ### Design Observations
-The design prioritizes client-side performance and maintainability through:
-*   **Efficient Responsive Design**: Using `window.matchMedia` for responsive logic avoids less performant `resize` event listeners.
-*   **Centralized State Management for Toasts**: A custom global singleton store for toasts centralizes notification logic, reducing prop drilling and ensuring consistency.
-*   **Predictable State Transitions**: The use of a reducer pattern for toast state management promotes predictable updates, although the `use-toast` implementation notes side effects within the reducer.
-*   **Controlled Toast Visibility**: The `TOAST_LIMIT` of 1 for toasts suggests a design choice to minimize UI clutter by allowing only one toast to be visible at a time, with an emphasis on explicit dismissal.
+*   **Separation of Concerns:** A strong adherence to the controller-service pattern is evident, clearly separating HTTP concerns from business logic.
+*   **Asynchronous Operations:** Extensive use of `async/await` indicates that the application is designed to handle I/O-bound operations efficiently without blocking the event loop, typical for database interactions or external API calls.
+*   **Modularity:** The organization into distinct `controllers` and `services` directories promotes modularity, making the codebase easier to understand, maintain, and test.
+*   **Implicit Middleware:** The reliance on `req.user.id` suggests the presence of an authentication middleware that processes requests before they reach the controllers.
+*   **Error Handling (Inferred):** While not explicitly shown in the snippets, the absence of `try-catch` blocks in controllers implies that a global error handling middleware is likely in place to catch exceptions from the service layer and send appropriate HTTP error responses.
 
 ### System Diagram
 ```mermaid
 graph TD
-A[FrontendApplication] --> B[UseMobileHook]
-A --> C[UseToastHook]
-C --> D[GlobalToastState]
+Client[ClientApplication] --> HttpRequest[HTTPRequest]
+HttpRequest --> Router[Router]
+Router --> Controller[ControllerLayer]
+Controller --> Service[ServiceLayer]
+Service --> DataStore[DataStore]
+DataStore --> Service
+Service --> Controller
+Controller --> HttpResponse[HTTPResponse]
+HttpResponse --> Client
 ```
